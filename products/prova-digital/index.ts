@@ -80,15 +80,31 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
       passos: [
         { titulo: 'Capture', texto: 'Marque o consentimento e escolha: print da tela, gravação da tela ou um arquivo que você já tem.' },
         { titulo: 'Cofre', texto: 'Calculamos a impressão digital (SHA-256) no seu navegador e o servidor confere. O arquivo vai para um cofre privado, sem link público.' },
-        { titulo: 'Carimbo e pacote', texto: 'A impressão digital é registrada em calendários OpenTimestamps, que ancoram no Bitcoin em algumas horas. Você recebe um código (mostrado uma única vez) e um pacote .zip que qualquer pessoa confere sem depender da gente.' },
+        { titulo: 'Carimbo e pacote', texto: 'A impressão digital é registrada em calendários OpenTimestamps, que ancoram no Bitcoin (costuma levar algumas horas). Você recebe um código (mostrado uma única vez) e um pacote .zip que qualquer pessoa confere sem depender da gente.' },
       ],
       perguntas: [
-        { pergunta: 'Isso vale como prova na Justiça?', resposta: 'Não prometemos isso. O carimbo mostra que o arquivo existia nesta data e não mudou depois. Quem decide se serve como prova é o juiz, caso a caso. Para um fato importante, considere também uma ata notarial.' },
+        { pergunta: 'Isso vale como prova na Justiça?', resposta: 'Não prometemos isso. O carimbo mostra que o arquivo existia nesta data e não mudou depois. Quem decide se serve como prova é o juiz, caso a caso. Para um fato importante, considere também uma ata notarial. A base legal, com o texto da lei, está mais abaixo.' },
         { pergunta: 'Quem vê o meu arquivo?', resposta: 'Ninguém por link. Só quem tem o identificador e o código de recuperação baixa o pacote. A operação pode abrir um arquivo para tratar uma denúncia, e cada abertura fica registrada num log que não pode ser apagado.' },
         { pergunta: 'Vocês guardam o meu IP?', resposta: 'Não. Guardamos só uma marca irreversível dele, para limitar abuso.' },
         { pergunta: 'E se eu perder o código?', resposta: 'Não conseguimos recuperar. Guardamos apenas o hash dele. Salve o código assim que aparecer.' },
         { pergunta: 'Funciona no celular?', resposta: 'Print e gravação da tela direto do navegador dependem do computador. No celular, envie o arquivo (o print que você já tirou). O carimbo é o mesmo, mas não conseguimos atestar como o arquivo foi gerado.' },
       ],
+      planos: [
+        { nome: 'Avulso', preco: 'R$ 9,90', unidade: 'por prova', inclui: ['1 arquivo: print, vídeo ou PDF até 95 MB', 'Carimbo no Bitcoin e pacote .zip verificável', 'Cópia no cofre por 5 anos', 'A primeira é por nossa conta'] },
+        { nome: 'Caso', preco: 'R$ 39', unidade: 'até 30 provas', destaque: true, inclui: ['A conversa inteira: até 30 arquivos em 12 meses', 'Conta por e-mail, sem senha: Minhas provas', 'Baixe o pacote quando quiser, sem depender do código', 'Cópia no cofre por 5 anos'] },
+        { nome: 'Escritório', preco: 'R$ 149', unidade: 'por mês', inclui: ['Até 200 provas por mês', 'Conta por e-mail para organizar tudo', 'Cópia no cofre por 5 anos', 'Sem fidelidade: cancele quando quiser'] },
+      ],
+      planosNota: 'Durante o teste, guardar é grátis (até 50 provas por dia). Os planos começam a valer quando o acesso por e-mail estiver ligado. Quem guardou antes não perde nada.',
+      baseLegal: {
+        intro: 'O que a lei diz, com o texto e o link oficial, e o que o carimbo prova. Sem exagero.',
+        itens: [
+          { norma: 'Código de Processo Civil, art. 369', link: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm#art369', trecho: 'As partes têm o direito de empregar todos os meios legais, bem como os moralmente legítimos, ainda que não especificados neste Código, para provar a verdade dos fatos em que se funda o pedido ou a defesa e influir eficazmente na convicção do juiz.', leitura: 'A lei não lista todos os meios de prova. Um print guardado com data e integridade pode ser usado; quem avalia o peso dele é o juiz.' },
+          { norma: 'Código de Processo Civil, art. 422, § 1º', link: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm#art422', trecho: 'As fotografias digitais e as extraídas da rede mundial de computadores fazem prova das imagens que reproduzem, devendo, se impugnadas, ser apresentada a respectiva autenticação eletrônica ou, não sendo possível, realizada perícia.', leitura: 'Se a outra parte contestar o print, será preciso mostrar a autenticação eletrônica ou fazer perícia. O pacote (impressão digital, hora do nosso servidor e carimbo no Bitcoin) é o material que esse exame confere.' },
+          { norma: 'Código de Processo Civil, art. 384, parágrafo único', link: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm#art384', trecho: 'Dados representados por imagem ou som gravados em arquivos eletrônicos poderão constar da ata notarial.', leitura: 'Quando o caso pedir fé pública, o caminho é a ata notarial em cartório. Leve o pacote junto.' },
+          { norma: 'Medida Provisória 2.200-2/2001, art. 10, § 2º', link: 'https://www.planalto.gov.br/ccivil_03/mpv/antigas_2001/2200-2.htm', trecho: 'O disposto nesta Medida Provisória não obsta a utilização de outro meio de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil, desde que admitido pelas partes como válido ou aceito pela pessoa a quem for oposto o documento.', leitura: 'Nosso carimbo não é ICP-Brasil e não tem a presunção legal dos certificados ICP. Ele vale como outro meio de comprovar integridade e data, e depende de ser aceito no caso.' },
+        ],
+        ressalva: 'Não encontramos lei nem decisão em fonte oficial que trate especificamente de carimbo em blockchain como prova. Por isso não dizemos que ele é aceito. Isto não é aconselhamento jurídico: num caso concreto, fale com um advogado. Textos conferidos no site do Planalto em 10/10/2026.',
+      },
       limites: [
         'Não provamos que o conteúdo é verdadeiro, só que este arquivo existia e não mudou.',
         'Não substituímos ata notarial nem garantimos aceitação judicial.',

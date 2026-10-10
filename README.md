@@ -17,19 +17,19 @@ Veja `docs/ARQUITETURA.md`.
 ```bash
 pnpm install
 pnpm test                  # contrato, ontologia BR, cobertura de cada produto
-echo 'API_TOKEN=teste-local' > apps/runtime/.dev.vars
+echo 'API_TOKEN=teste-local' > .dev.vars
 pnpm db:local
 pnpm dev                   # http://localhost:8787  (/ = público, /studio = interno)
 ```
 
-## Subir no Wrangler
-```bash
-npx wrangler login
-npx wrangler d1 create maquina          # cole o database_id em apps/runtime/wrangler.jsonc
-pnpm db:remoto
-npx wrangler secret put API_TOKEN -c apps/runtime/wrangler.jsonc
-pnpm deploy
-```
+## Publicar
+**Pelo painel da Cloudflare (recomendado):** Workers & Pages → Create → Import a repository → este repositório, branch `main`.
+- Nome do Worker: `maquinaativos`. Root directory: em branco.
+- Deploy command: `pnpm run publicar` (cria as tabelas e sobe o Worker). **Não use `pnpm deploy`**: é um comando interno do pnpm.
+- Antes: crie o banco D1 `maquina` e cole o `database_id` em `wrangler.jsonc`.
+- Depois: Settings → Variables & Secrets → secret `API_TOKEN`.
+
+**Pelo terminal:** `npx wrangler login`, `npx wrangler secret put API_TOKEN`, `pnpm run publicar`.
 
 ## Criar um produto
 Branch `produto/<nome>`, só dentro de `products/<nome>/`: `index.ts`, `rule.ts`, `casos.ts`, `NAO-FAREMOS.md`; depois `pnpm registro`. A CI recusa se faltar teste por estado e por motivo, ou se a branch tocar fora da pasta.

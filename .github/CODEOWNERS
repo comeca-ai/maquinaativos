@@ -3,5 +3,6 @@
 /products/*/rule.ts   @comeca-ai/dono
 /packages/core/       @comeca-ai/dono
 /apps/runtime/        @comeca-ai/dono
+/wrangler.jsonc       @comeca-ai/dono
 /scripts/cerca.mjs    @comeca-ai/dono
 /.github/             @comeca-ai/dono

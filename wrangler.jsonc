@@ -1,13 +1,15 @@
 {
-  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "maquinaativos",
-  "main": "src/index.ts",
+  "main": "apps/runtime/src/index.ts",
   "compatibility_date": "2026-03-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  "workers_dev": true,
+  "preview_urls": false,
   // Frontend estático no MESMO Worker. API e rotas públicas passam primeiro pelo código; o resto é arquivo.
   "assets": {
-    "directory": "./public",
+    "directory": "./apps/runtime/public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/pub/*", "/saude"]
@@ -18,13 +20,12 @@
     {
       "binding": "DB",
       "database_name": "maquina",
-      // Depois de `wrangler d1 create maquina`, cole aqui o database_id que ele devolver.
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
+      "database_id": "f0eb4408-d50c-48ac-a414-9810c6962854",
+      "migrations_dir": "apps/runtime/migrations"
     }
   ],
   "workflows": [
     { "name": "maquina-caso", "binding": "CASO_WF", "class_name": "CasoWorkflow" }
   ]
-  // Segredo de escrita: `wrangler secret put API_TOKEN` (local: apps/runtime/.dev.vars).
+  // Segredo de escrita: `wrangler secret put API_TOKEN` (local: `.dev.vars` na raiz).
 }

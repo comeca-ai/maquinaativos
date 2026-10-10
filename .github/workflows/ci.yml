@@ -1,0 +1,26 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Registro de produtos em dia
+        run: pnpm registro:check
+      - name: Tipos
+        run: pnpm typecheck
+      - name: Testes (inclui cobertura de estados e motivos por produto)
+        run: pnpm test
+      - name: Cerca (cada branch só toca o que pode)
+        if: github.event_name == 'pull_request'
+        run: node scripts/cerca.mjs "${{ github.head_ref }}" "origin/${{ github.base_ref }}"
+      - name: Bundle do Worker compila
+        run: npx wrangler deploy --dry-run -c apps/runtime/wrangler.jsonc --outdir /tmp/wr

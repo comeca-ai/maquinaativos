@@ -68,7 +68,9 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
       nome: 'Tinha Print',
       destaque: 'Print',
       promessa: 'Guarde a prova antes que apaguem.',
-      chamada: 'Guardar uma prova agora',
+      chamada: 'Enviar meu print',
+      fechamento: 'Apagaram? Você tinha print.',
+      exemplo: { arquivo: 'conversa.png', bytes: 284312 },
       cenas: [
         { titulo: 'A conversa que o outro apagou', texto: 'Mensagem, áudio ou ameaça que sumiu do aplicativo depois que você mostrou que ia usar.' },
         { titulo: 'O anúncio que saiu do ar', texto: 'A oferta, o preço ou a promessa que estava na página e depois mudou ou desapareceu.' },

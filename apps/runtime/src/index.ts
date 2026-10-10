@@ -1,29 +1,32 @@
 import { Hono } from 'hono'
 import { validarEntrada } from '@maquina/core'
 import { produtos } from './registro.gerado'
+import { publico, hojeBR } from './publico'
 import type { Env } from './env'
 
 export { CasoWorkflow } from './workflow'
 
 const app = new Hono<{ Bindings: Env }>()
 
-const hojeBR = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
-
 app.get('/saude', (c) => c.json({ ok: true, produtos: Object.keys(produtos) }))
 
-// Tudo abaixo é interno: exige Bearer API_TOKEN (o Studio entra depois, atrás do Cloudflare Access).
-app.use('*', async (c, next) => {
-  if (c.req.path === '/saude') return next()
+// Público: a experiência de cada produto, renderizada pelo framework a partir da `tela` declarada.
+app.route('/pub', publico)
+
+// Interno: tudo em /api exige Bearer API_TOKEN (Studio). Cloudflare Access entra como 2ª camada.
+const api = new Hono<{ Bindings: Env }>()
+api.use('*', async (c, next) => {
   const esperado = c.env.API_TOKEN
   if (!esperado || c.req.header('authorization') !== `Bearer ${esperado}`) return c.json({ erro: 'nao_autorizado' }, 401)
   return next()
 })
 
-app.get('/p', (c) =>
+api.get('/p', (c) =>
   c.json(
     Object.values(produtos).map((p) => ({
       nome: p.nome,
       versao: p.versao,
+      publico: Boolean(p.tela),
       estados: p.estados,
       motivos: p.motivos,
       criterioDeMorte: p.criterioDeMorte,
@@ -32,7 +35,7 @@ app.get('/p', (c) =>
   ),
 )
 
-app.post('/p/:produto/casos', async (c) => {
+api.post('/p/:produto/casos', async (c) => {
   const p = produtos[c.req.param('produto')]
   if (!p) return c.json({ erro: 'produto_desconhecido' }, 404)
   const corpo = await c.req.json().catch(() => null)
@@ -50,8 +53,8 @@ app.post('/p/:produto/casos', async (c) => {
   return c.json({ casoId, workflow: inst.id }, 202)
 })
 
-// Reavaliar um caso com dados novos. Caso em estado final só reavalia com ?reabrir=1 (a regra do produto decide se aceita).
-app.post('/casos/:id/avaliar', async (c) => {
+// Reavaliar um caso com dados novos. Estado final só reavalia com ?reabrir=1 (a regra do produto decide se aceita).
+api.post('/casos/:id/avaliar', async (c) => {
   const caso = await c.env.DB.prepare('SELECT produto, final FROM casos WHERE id = ?').bind(c.req.param('id')).first<{ produto: string; final: number }>()
   if (!caso) return c.json({ erro: 'caso_inexistente' }, 404)
   if (caso.final && c.req.query('reabrir') !== '1') return c.json({ erro: 'caso_em_estado_final', dica: 'use ?reabrir=1 com evidência nova' }, 409)
@@ -64,7 +67,12 @@ app.post('/casos/:id/avaliar', async (c) => {
   return c.json({ workflow: inst.id }, 202)
 })
 
-app.get('/casos/:id', async (c) => {
+api.get('/casos', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT * FROM casos ORDER BY atualizado_em DESC LIMIT 100').all()
+  return c.json({ casos: results })
+})
+
+api.get('/casos/:id', async (c) => {
   const id = c.req.param('id')
   const caso = await c.env.DB.prepare('SELECT * FROM casos WHERE id = ?').bind(id).first()
   if (!caso) return c.json({ erro: 'caso_inexistente' }, 404)
@@ -73,9 +81,28 @@ app.get('/casos/:id', async (c) => {
 })
 
 // "Casos incompletos": não-finais com prazo vencido. Nada fica em análise para sempre.
-app.get('/vencidos', async (c) => {
+api.get('/vencidos', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT * FROM casos WHERE final = 0 AND prazo_ate IS NOT NULL AND prazo_ate < ? ORDER BY prazo_ate').bind(hojeBR()).all()
   return c.json({ hoje: hojeBR(), vencidos: results })
 })
+
+// Sinais do funil: o que mede o critério de morte dos produtos públicos.
+api.get('/sinais', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT produto, tipo, COALESCE(motivo, '-') AS motivo, COUNT(*) AS total, MIN(em) AS primeiro, MAX(em) AS ultimo
+     FROM sinais GROUP BY produto, tipo, motivo ORDER BY produto, tipo, total DESC`,
+  ).all()
+  return c.json({ sinais: results })
+})
+
+api.get('/interesses', async (c) => {
+  const { results } = await c.env.DB.prepare('SELECT id, produto, contato, motivo, em FROM interesses ORDER BY id DESC LIMIT 200').all()
+  return c.json({ interesses: results })
+})
+
+app.route('/api', api)
+
+// Todo o resto (/, /studio, /<produto>) é arquivo estático / SPA, servido pelo binding ASSETS.
+app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
 
 export default app

@@ -72,3 +72,34 @@ button:disabled{opacity:.6;cursor:progress}
 .kpi{background:var(--cartao);border:1px solid var(--linha);border-radius:var(--raio);padding:14px}
 .kpi strong{display:block;font:600 28px/1.1 var(--serif)}
 .kpi span{color:var(--suave);font-size:14px}
+
+.acoes{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+.codigo{font:600 20px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--papel);border:1px dashed var(--acento);border-radius:var(--raio);padding:12px;word-break:break-all;user-select:all}
+.mono{font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+
+/* marca da captura (texto vindo do produto; estilo genérico) */
+.marca-info{margin-top:36px}
+.passos{list-style:none;counter-reset:p;padding:0;margin:0;display:grid;gap:12px}
+.passos li{counter-increment:p;display:grid;grid-template-columns:2.2rem 1fr;gap:2px 10px;padding:14px;border:1px solid var(--linha);border-radius:var(--raio);background:var(--cartao)}
+.passos li::before{content:counter(p);grid-row:span 2;font:600 26px/1 var(--serif);color:var(--acento)}
+.passos span{color:var(--suave);font-size:15px}
+.faq{border-bottom:1px solid var(--linha);padding:10px 0}
+.faq summary{cursor:pointer;font-weight:600}
+.faq p{color:var(--suave);margin:8px 0 2px;font-size:15px}
+.limites{padding-left:1.2em;color:var(--suave);font-size:15px}
+.limites li{margin:4px 0}
+
+/* landing */
+.landing{max-width:860px}
+.heroi{padding:18px 0 8px}
+.heroi h1{font-size:clamp(34px,8vw,56px);line-height:1.06}
+.heroi .botao{font-size:18px;padding:15px 26px}
+.selo{color:var(--suave);font-size:14px;margin:14px 0 0}
+.cenas{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:600px){.cenas{grid-template-columns:1fr 1fr}}
+.cena{display:grid;gap:4px;padding:14px;border:1px solid var(--linha);border-radius:var(--raio);background:var(--cartao)}
+.cena strong{font-family:var(--serif);font-size:18px}
+.cena span{color:var(--suave);font-size:15px}
+.ferramenta{margin:34px 0 8px;padding:20px;border:1px solid var(--linha);border-radius:var(--raio);background:var(--cartao);scroll-margin-top:16px}
+.ferramenta .aviso{background:transparent}
+.recuperar{margin-top:36px;padding-top:6px;border-top:1px solid var(--linha)}

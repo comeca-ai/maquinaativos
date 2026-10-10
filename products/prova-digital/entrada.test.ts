@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validarEntrada } from '@maquina/core'
+import { validarEntrada, executar } from '@maquina/core'
 import produto from './index'
 
 const H = 'b'.repeat(64)
@@ -21,4 +21,20 @@ describe('prova-digital: entradas contraditórias são recusadas na porta', () =
   it('data de envio sem âncora enviada', () => invalida({ ancoraEnviadaEm: '2026-03-02' }))
   it('gravado antes de solicitado', () => invalida({ gravadoEm: '2026-03-01' }))
   it('hash que não é SHA-256 hex', () => invalida({ arquivoSha256: 'abc' }))
+})
+
+describe('prova-digital: prazoAte oficial vem das datas de fato', () => {
+  const prazo = async (e: object, hoje: string) => { const r = await executar(produto, { ...ok, ...e }, { hoje }); return r.ok ? { estado: r.veredito.estado, prazoAte: r.transicao.prazoAte } : null }
+  it('guardada: gravadoEm + 2 dias, não hoje + 2', async () => {
+    expect(await prazo({}, '2026-03-04')).toEqual({ estado: 'guardada', prazoAte: '2026-03-04' })
+  })
+  it('ancorando: ancoraEnviadaEm + 3 dias', async () => {
+    expect(await prazo({ ancora: 'enviada', ancoraEnviadaEm: '2026-03-02' }, '2026-03-04')).toEqual({ estado: 'ancorando', prazoAte: '2026-03-05' })
+  })
+  it('aguardando_captura: solicitadoEm + 3 dias', async () => {
+    expect(await prazo({ arquivoSha256: null, gravadoNoCofre: false, manifestoGravado: false, gravadoEm: null }, '2026-03-03')).toEqual({ estado: 'aguardando_captura', prazoAte: '2026-03-05' })
+  })
+  it('estado final não tem prazo', async () => {
+    expect(await prazo({ ancora: 'confirmada', ancoraEnviadaEm: '2026-03-02' }, '2026-03-03')).toEqual({ estado: 'preservada', prazoAte: null })
+  })
 })

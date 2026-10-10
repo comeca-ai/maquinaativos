@@ -24,6 +24,23 @@ export interface FatosCaptura {
   ancoraEnviadaEm: string | null
 }
 
+/** Identidade pública opcional da página de captura (nome, promessa, passos, perguntas e limites). Só texto: o framework não interpreta. */
+export interface MarcaCaptura {
+  nome: string
+  /** Parte do nome destacada na cor de acento (ex.: 'Print' em 'Tinha Print'). Deve ser sufixo de `nome`. */
+  destaque?: string
+  /** Promessa em uma frase (a manchete). */
+  promessa: string
+  /** Situações reais em que a pessoa precisa disto (vira a seção de abertura da landing). */
+  cenas?: readonly { titulo: string; texto: string }[]
+  /** Texto do botão principal da landing. Padrão: 'Guardar uma prova agora'. */
+  chamada?: string
+  passos: readonly { titulo: string; texto: string }[]
+  perguntas: readonly { pergunta: string; resposta: string }[]
+  /** O que a ferramenta NÃO faz, dito de forma clara. */
+  limites: readonly string[]
+}
+
 export interface Captura<In = unknown> {
   titulo: string
   subtitulo: string
@@ -32,6 +49,7 @@ export interface Captura<In = unknown> {
   /** Prefixos de MIME aceitos (ex.: 'image/', 'video/', 'application/pdf'). */
   tiposMime: readonly string[]
   maxBytes: number
+  marca?: MarcaCaptura
   /** Pura: fatos -> entrada da regra do produto. */
   montarEntrada: (f: FatosCaptura) => In
 }
@@ -43,5 +61,14 @@ export function validarCaptura(c: Captura): string[] {
   if (!c.titulo || !c.subtitulo || !c.aviso) e.push('captura: titulo, subtitulo e aviso são obrigatórios')
   if (c.tiposMime.length === 0) e.push('captura.tiposMime não pode ser vazio')
   if (!Number.isInteger(c.maxBytes) || c.maxBytes <= 0 || c.maxBytes > MAX_BYTES_CAPTURA) e.push(`captura.maxBytes deve estar entre 1 e ${MAX_BYTES_CAPTURA}`)
+  const m = c.marca
+  if (m) {
+    if (!m.nome || !m.promessa) e.push('captura.marca: nome e promessa são obrigatórios')
+    if (m.destaque && !m.nome.endsWith(m.destaque)) e.push('captura.marca.destaque deve ser o final do nome')
+    if (m.passos.length === 0 || m.passos.some((x) => !x.titulo || !x.texto)) e.push('captura.marca.passos: ao menos um passo, todos com título e texto')
+    if (m.cenas?.some((x) => !x.titulo || !x.texto)) e.push('captura.marca.cenas: título e texto não podem ser vazios')
+    if (m.perguntas.some((x) => !x.pergunta || !x.resposta)) e.push('captura.marca.perguntas: pergunta e resposta não podem ser vazias')
+    if (m.limites.length === 0) e.push('captura.marca.limites: declare o que a ferramenta não faz')
+  }
   return e
 }

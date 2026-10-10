@@ -54,7 +54,11 @@ export interface Captura<In = unknown> {
   montarEntrada: (f: FatosCaptura) => In
 }
 
-export const MAX_BYTES_CAPTURA = 100 * 1024 * 1024 // limite do corpo de requisição em Workers (plano gratuito/pago)
+/**
+ * Limite do corpo da requisição na Cloudflare depende do plano da ZONA: Free/Pro 100 MB, Business 200 MB
+ * (https://developers.cloudflare.com/workers/platform/limits/, consultado em 10/10/2026). Ficamos abaixo com folga.
+ */
+export const MAX_BYTES_CAPTURA = 95 * 1024 * 1024
 
 export function validarCaptura(c: Captura): string[] {
   const e: string[] = []

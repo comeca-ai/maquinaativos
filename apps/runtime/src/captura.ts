@@ -100,7 +100,7 @@ capturaPublica.get('/dominio', (c) => {
   return c.json({ produto: nome })
 })
 
-// PUT /pub/:produto/captura?nome=&sha256=&origem=navegador|arquivo_enviado&consentimento=1  (corpo = bytes do arquivo)
+// PUT /pub/:produto/captura?sha256=&origem=navegador|arquivo_enviado&consentimento=1  (corpo = bytes; nome em x-nome-arquivo)
 capturaPublica.put('/:produto/captura', async (c) => {
   const p = produtoDeCaptura(c.req.param('produto'))
   if (!p) return c.json({ erro: 'produto_sem_captura' }, 404)
@@ -152,7 +152,10 @@ capturaPublica.put('/:produto/captura', async (c) => {
   const sha = obj.checksums.sha256 ? hexDe(obj.checksums.sha256) : hashCliente
 
   const agora = new Date()
-  const nome = nomeSeguro(q.nome)
+  // Nome do arquivo vem no cabeçalho (não na URL): a URL entra nos logs do Workers e o nome pode ser dado pessoal.
+  let nomeCabecalho: string | undefined
+  try { nomeCabecalho = c.req.header('x-nome-arquivo') ? decodeURIComponent(c.req.header('x-nome-arquivo')!) : undefined } catch { nomeCabecalho = undefined }
+  const nome = nomeSeguro(nomeCabecalho ?? q.nome)
   const manifesto = jsonEstavel({
     versaoManifesto: 1, produto: p.nome, produtoVersao: p.versao, provaId: id, origem,
     arquivo: { nome, mime, bytes: obj.size, sha256: sha },
@@ -323,8 +326,9 @@ export async function manutencaoCaptura(env: Env): Promise<{ ancoradas: number; 
         }
       }
     }
-    const caso = await env.DB.prepare('SELECT final FROM casos WHERE id = ?').bind(r.caso_id).first<{ final: number }>()
-    if (caso && !caso.final) {
+    // Reavalia só quando um fato mudou ou o prazo do estado chegou: evita um Workflow por prova a cada hora (custo de steps).
+    const caso = await env.DB.prepare('SELECT final, prazo_ate FROM casos WHERE id = ?').bind(r.caso_id).first<{ final: number; prazo_ate: string | null }>()
+    if (caso && !caso.final && (mudou || !caso.prazo_ate || caso.prazo_ate <= hojeBR())) {
       await registrarCaso(env, p, r.caso_id, fatosDaProva(r)).catch(() => undefined)
       reavaliadas++
     } else if (mudou) {

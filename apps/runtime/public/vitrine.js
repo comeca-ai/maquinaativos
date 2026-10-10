@@ -109,12 +109,12 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   /* ferramenta */
   const aceite = h('input', { type: 'checkbox', id: 'aceite' })
   const consentimento = h('label', { class: 'v-consent', for: 'aceite' }, aceite,
-    h('span', {}, 'Autorizo guardar este arquivo em cofre privado e registrar só a impressão digital dele (SHA-256) em calendários públicos. ', h('a', { href: '#limites' }, 'O que isso prova')))
+    h('span', {}, 'Autorizo guardar este arquivo num cofre privado. Só a impressão digital dele, não o arquivo, vai para um registro público. ', h('a', { href: m.baseLegal ? '#base-legal' : '#limites' }, 'O que isso prova')))
   const arquivo = h('input', { type: 'file', id: 'arquivo', hidden: true, accept: cfg.tiposMime.map((t) => (t.endsWith('/') ? t + '*' : t)).join(',') })
   const principal = h('button', { type: 'button', class: 'v-botao', onclick: () => { if (consentido()) arquivo.click() } }, m.chamada || 'Escolher arquivo')
   const barra = h('i'); const progresso = h('div', { class: 'v-progresso', hidden: true, 'aria-hidden': 'true' }, barra)
   const msg = h('p', { class: 'v-status', role: 'status', 'aria-live': 'polite' })
-  const alt = podeTela ? h('p', { class: 'v-alt' }, 'Ou ', h('button', { type: 'button', class: 'v-link', onclick: () => printDaTela() }, 'tire um print desta tela'), ' · ', h('button', { type: 'button', class: 'v-link', onclick: (e) => gravarTela(e.target) }, 'grave a tela'), ` · arraste o arquivo aqui (até ${maxMB} MB)`) : h('p', { class: 'v-alt' }, `Foto, print, vídeo, PDF ou texto, até ${maxMB} MB.`)
+  const alt = podeTela ? h('p', { class: 'v-alt' }, 'Ou ', h('button', { type: 'button', class: 'v-link', onclick: () => printDaTela() }, 'tire um print desta tela'), ' · ', h('button', { type: 'button', class: 'v-link', onclick: (e) => gravarTela(e.target) }, 'grave a tela'), ` · arraste o arquivo aqui (até ${maxMB} MB)`) : h('p', { class: 'v-alt' }, `Funciona no celular: foto, print, vídeo, PDF ou texto, até ${maxMB} MB. O pacote fica com você.`)
   const ferramenta = h('div', { class: 'v-ferramenta', id: 'guardar' }, consentimento, principal, alt, progresso, msg, h('p', { class: 'v-aviso' }, cfg.aviso), arquivo)
 
   function consentido() {
@@ -196,7 +196,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
           h('button', { type: 'button', class: 'v-link', onclick: () => baixarTexto(`codigo-${r.id}.txt`, textoCodigo) }, 'Salvar como .txt')))
     const bloco = h('div', { class: 'v-resultado' },
       h('h2', {}, 'Guardado.'),
-      recibo({ id: r.id, nome: r.nome, bytes: r.bytes, sha256: r.sha256, recebidoEm: r.recebidoEm, carimbo: r.ancora === 'enviada' ? 'enviado ao OpenTimestamps; o Bitcoin confirma em algumas horas' : 'na fila; tentamos de novo em até 1 hora', bater: true }),
+      recibo({ id: r.id, nome: r.nome, bytes: r.bytes, sha256: r.sha256, recebidoEm: r.recebidoEm, carimbo: r.ancora === 'enviada' ? 'enviado ao OpenTimestamps; a confirmação no Bitcoin costuma levar algumas horas' : 'na fila; tentamos de novo em até 1 hora', bater: true }),
       caixaCodigo,
       h('div', { class: 'v-acoes' },
         h('button', { type: 'button', class: 'v-botao', onclick: () => baixarPacote(nome, r.id, r.naConta ? null : codigo, status) }, 'Baixar pacote (.zip)'),
@@ -240,14 +240,29 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   const perguntas = m.perguntas.length ? h('section', { class: 'v-secao' }, h('h2', {}, 'Antes de você perguntar'),
     h('div', { class: 'v-perguntas' }, m.perguntas.map((q) => h('div', {}, h('h3', {}, q.pergunta), h('p', {}, q.resposta))))) : null
 
-  const limites = h('section', { class: 'v-secao v-limites', id: 'limites' }, h('h2', {}, 'O que a gente não faz'), h('ul', {}, m.limites.map((x) => h('li', {}, x))))
+  const limites = m.baseLegal
+    ? h('section', { class: 'v-secao v-base', id: 'base-legal' }, h('h2', {}, 'Base legal'),
+        h('p', { class: 'v-base-intro' }, m.baseLegal.intro),
+        h('ol', { class: 'v-normas' }, m.baseLegal.itens.map((i) => h('li', {},
+          h('h3', {}, h('a', { href: i.link, target: '_blank', rel: 'noopener' }, i.norma)),
+          h('blockquote', {}, `“${i.trecho}”`),
+          h('p', {}, i.leitura)))),
+        h('div', { class: 'v-limites', id: 'limites' }, h('h3', {}, 'O que o carimbo não faz'), h('ul', {}, m.limites.map((x) => h('li', {}, x)))),
+        h('p', { class: 'v-ressalva' }, m.baseLegal.ressalva))
+    : h('section', { class: 'v-secao v-limites', id: 'limites' }, h('h2', {}, 'O que a gente não faz'), h('ul', {}, m.limites.map((x) => h('li', {}, x))))
+
+  const planos = m.planos?.length ? h('section', { class: 'v-secao v-planos', id: 'planos' }, h('h2', {}, 'Planos'),
+    h('div', { class: 'v-planos-grade' }, m.planos.map((p) => h('div', { class: 'v-plano' + (p.destaque ? ' destaque' : '') },
+      h('h3', {}, p.nome), h('p', { class: 'v-preco' }, h('strong', {}, p.preco), h('span', {}, ` ${p.unidade}`)),
+      h('ul', {}, p.inclui.map((x) => h('li', {}, x)))))),
+    m.planosNota ? h('p', { class: 'v-planos-nota' }, m.planosNota) : null) : null
 
   const irParaFerramenta = () => { ferramenta.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (ferramenta.contains(aceite)) aceite.focus({ preventScroll: true }) }
   const fechamento = h('section', { class: 'v-fechamento' }, h('p', {}, m.fechamento || m.promessa), h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
   const fixa = h('div', { class: 'v-fixa', hidden: true }, h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
-  app.replaceChildren(heroi, cenas, pacote, como, perguntas, limites, fechamento, fixa)
+  app.replaceChildren(heroi, cenas, pacote, planos, como, perguntas, limites, fechamento, fixa)
   evento(nome, 'visita', true)
 
   if ('IntersectionObserver' in window) {

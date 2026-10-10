@@ -39,6 +39,16 @@ export interface MarcaCaptura {
   fechamento?: string
   /** Arquivo fictício do recibo de exemplo no topo da página (rotulado como exemplo). */
   exemplo?: { arquivo: string; bytes: number }
+  /** Planos à venda (só vitrine: quem cobra e libera crédito é outra peça). */
+  planos?: readonly { nome: string; preco: string; unidade: string; inclui: readonly string[]; destaque?: boolean }[]
+  /** Frase sob os planos (ex.: condição atual de teste). */
+  planosNota?: string
+  /** Seção BASE LEGAL: só norma lida em fonte oficial (link https), com o trecho literal e a leitura honesta. */
+  baseLegal?: {
+    intro: string
+    itens: readonly { norma: string; trecho: string; link: string; leitura: string }[]
+    ressalva: string
+  }
   passos: readonly { titulo: string; texto: string }[]
   perguntas: readonly { pergunta: string; resposta: string }[]
   /** O que a ferramenta NÃO faz, dito de forma clara. */
@@ -77,6 +87,11 @@ export function validarCaptura(c: Captura): string[] {
     if (m.cenas?.some((x) => !x.titulo || !x.texto)) e.push('captura.marca.cenas: título e texto não podem ser vazios')
     if (m.perguntas.some((x) => !x.pergunta || !x.resposta)) e.push('captura.marca.perguntas: pergunta e resposta não podem ser vazias')
     if (m.limites.length === 0) e.push('captura.marca.limites: declare o que a ferramenta não faz')
+    if (m.baseLegal) {
+      if (!m.baseLegal.ressalva) e.push('captura.marca.baseLegal.ressalva é obrigatória (o que NÃO foi confirmado)')
+      for (const i of m.baseLegal.itens) if (!/^https:\/\//.test(i.link) || !i.trecho || !i.leitura) e.push(`captura.marca.baseLegal: "${i.norma}" precisa de link https da fonte, trecho e leitura`)
+    }
+    if (m.planos?.some((p) => !p.nome || !p.preco || p.inclui.length === 0)) e.push('captura.marca.planos: nome, preço e o que inclui são obrigatórios')
   }
   return e
 }

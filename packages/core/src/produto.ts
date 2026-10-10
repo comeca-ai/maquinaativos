@@ -3,6 +3,8 @@ import type { Tela } from './tela'
 import { validarTela } from './tela'
 import type { Preco } from './preco'
 import { validarPreco } from './preco'
+import type { Captura } from './captura'
+import { validarCaptura } from './captura'
 
 /** Estado final não tem prazo. Estado não-final OBRIGATORIAMENTE tem prazo (nada de "em análise" eterno). */
 export type DefEstado = { final: true } | { final: false; prazoDias: number }
@@ -44,6 +46,10 @@ export interface Produto<E extends string = string, M extends string = string, I
   criterioDeMorte: CriterioDeMorte
   /** Tela pública declarada como DADOS. O framework renderiza; o produto não escreve HTML. Sem tela = produto interno. */
   tela?: Tela<M>
+  /** Prazo oficial de um estado não-final, quando ele depende de datas de fato (ex.: data da gravação) e não da data da avaliação. Devolve AAAA-MM-DD. Sem isto: hoje + prazoDias. */
+  prazoAte?(caso: In, estado: E, ctx: Contexto): string
+  /** Captura de evidência (arquivo + cofre + âncora) gerida pelo framework. Sem isto o produto não recebe arquivos. */
+  captura?: Captura<In>
   /** Preço declarado como dado (ver preco.ts). Opcional (produtos antigos seguem válidos); sem preço declarado a plataforma não abre pedido. */
   preco?: Preco
   /** Arquivo "o que não faremos" é obrigatório por produto (ver products/<x>/NAO-FAREMOS.md). */
@@ -79,6 +85,7 @@ export function validarProduto(p: Produto): string[] {
   if (!p.criterioDeMorte.metrica) erros.push('criterioDeMorte.metrica é obrigatória')
   if (p.tela) erros.push(...validarTela(p.tela, Object.keys(p.motivos)))
   if (p.preco) erros.push(...validarPreco(p.preco))
+  if (p.captura) erros.push(...validarCaptura(p.captura))
   if (p.naoFaremos.length === 0) erros.push('naoFaremos não pode ser vazio: diga o que este produto NÃO faz')
   return erros
 }

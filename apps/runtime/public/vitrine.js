@@ -254,10 +254,13 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
         h('p', { class: 'v-ressalva' }, m.baseLegal.ressalva))
     : h('section', { class: 'v-secao v-limites', id: 'limites' }, h('h2', {}, 'O que a gente não faz'), h('ul', {}, m.limites.map((x) => h('li', {}, x))))
 
-  const planos = m.planos?.length ? h('section', { class: 'v-secao v-planos', id: 'planos' }, h('h2', {}, 'Planos'),
-    h('div', { class: 'v-planos-grade' }, m.planos.map((p) => h('div', { class: 'v-plano' + (p.destaque ? ' destaque' : '') },
+  // Um plano só (ex.: lançamento para testar mercado): título no singular, cartão largo e botão que leva à ferramenta.
+  const unico = m.planos?.length === 1
+  const planos = m.planos?.length ? h('section', { class: 'v-secao v-planos', id: 'planos' }, h('h2', {}, unico ? 'Quanto custa' : 'Planos'),
+    h('div', { class: 'v-planos-grade' + (unico ? ' unico' : '') }, m.planos.map((p) => h('div', { class: 'v-plano' + (p.destaque ? ' destaque' : '') },
       h('h3', {}, p.nome), h('p', { class: 'v-preco' }, h('strong', {}, p.preco), h('span', {}, ` ${p.unidade}`)),
-      h('ul', {}, p.inclui.map((x) => h('li', {}, x)))))),
+      h('ul', {}, p.inclui.map((x) => h('li', {}, x))),
+      unico ? h('button', { type: 'button', class: 'v-botao', onclick: () => irParaFerramenta() }, m.chamada || 'Guardar agora') : null))),
     m.planosNota ? h('p', { class: 'v-planos-nota' }, m.planosNota) : null) : null
 
   const irParaFerramenta = () => { ferramenta.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (ferramenta.contains(aceite)) aceite.focus({ preventScroll: true }) }

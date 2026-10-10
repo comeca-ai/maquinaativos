@@ -61,7 +61,7 @@ async function paginaProduto(nome) {
   const campos = t.campos.map((c) => {
     const id = 'c_' + c.nome
     if (c.tipo === 'sim_nao') {
-      return h('fieldset', { style: 'border:0;padding:0;margin:0' },
+      return h('fieldset', { class: 'grupo' },
         h('legend', { class: 'rotulo' }, c.rotulo, c.ajuda ? h('span', { class: 'ajuda' }, c.ajuda) : null),
         h('div', { class: 'sim-nao' },
           h('label', {}, h('input', { type: 'radio', name: c.nome, value: 'nao', checked: true }), h('span', {}, 'Não')),
@@ -100,7 +100,7 @@ function resultado(nome, r, pegarToken) {
   const cartao = h('section', { class: 'cartao resultado ' + r.texto.tom },
     h('h2', {}, r.texto.titulo), h('p', {}, r.texto.explicacao),
     r.texto.proximoPasso ? h('p', {}, h('strong', {}, 'Próximo passo: '), r.texto.proximoPasso) : null)
-  if (r.oferecerAjuda) cartao.append(h('hr', { style: 'border:0;border-top:1px solid var(--linha);margin:18px 0' }), pedidoAjuda(nome, r, pegarToken))
+  if (r.oferecerAjuda) cartao.append(h('hr', { class: 'sep' }), pedidoAjuda(nome, r, pegarToken))
   return cartao
 }
 
@@ -178,7 +178,7 @@ async function secao(aba) {
   if (aba === 'produtos') {
     const p = await api('/p'); if (!p.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
     return h('div', {}, p.j.map((x) => h('section', { class: 'cartao' },
-      h('h2', { style: 'margin-top:0' }, `${x.nome} · ${x.versao}`, x.publico ? ' · público' : ' · interno'),
+      h('h2', { class: 'sem-topo' }, `${x.nome} · ${x.versao}`, x.publico ? ' · público' : ' · interno'),
       h('p', {}, h('strong', {}, 'Critério de morte: '), `${x.criterioDeMorte.minimo} × ${x.criterioDeMorte.metrica} em ${x.criterioDeMorte.prazoDias} dias`),
       h('p', {}, h('strong', {}, 'Estados: '), Object.entries(x.estados).map(([e, d]) => d.final ? `${e} (final)` : `${e} (prazo ${d.prazoDias}d)`).join(' · ')),
       h('p', {}, h('strong', {}, 'Não faremos: '), x.naoFaremos.join(' '))))) 

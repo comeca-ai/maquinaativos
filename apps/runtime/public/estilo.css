@@ -56,3 +56,7 @@ button:disabled{opacity:.6;cursor:progress}
 .studio{max-width:980px}
 .rolagem{overflow-x:auto}
 @media (max-width:480px){body{font-size:16px}.sim-nao{flex-direction:column}}
+
+.grupo{border:0;padding:0;margin:0}
+.sep{border:0;border-top:1px solid var(--linha);margin:18px 0}
+.sem-topo{margin-top:0}

@@ -5,9 +5,9 @@ import type { Env } from './env'
 
 export const hojeBR = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
 
-const publicos = () => Object.values(produtos).filter((p) => p.tela)
+const publicos = () => Object.values(produtos).filter((p) => p.tela || p.captura)
 
-async function turnstileOk(env: Env, token: unknown, ip: string | undefined): Promise<boolean> {
+export async function turnstileOk(env: Env, token: unknown, ip: string | undefined): Promise<boolean> {
   if (!env.TURNSTILE_SECRET) return true // sem segredo configurado = verificação desligada (dev)
   if (typeof token !== 'string' || !token) return false
   const form = new FormData()
@@ -23,7 +23,7 @@ async function turnstileOk(env: Env, token: unknown, ip: string | undefined): Pr
 export const publico = new Hono<{ Bindings: Env }>()
 
 publico.get('/produtos', (c) =>
-  c.json(publicos().map((p) => ({ nome: p.nome, titulo: p.tela!.titulo, subtitulo: p.tela!.subtitulo }))),
+  c.json(publicos().map((p) => ({ nome: p.nome, titulo: (p.tela ?? p.captura)!.titulo, subtitulo: (p.tela ?? p.captura)!.subtitulo }))),
 )
 
 publico.get('/:produto/tela', (c) => {

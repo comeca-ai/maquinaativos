@@ -91,3 +91,18 @@ export function regra(c: EntradaProva, ctx: Contexto): Veredito<EstadoProva, Mot
     ? { estado: 'preservada_sem_ancora', motivo: 'ancora_nao_enviada_no_prazo' }
     : { estado: 'guardada', motivo: 'guardada_sem_ancora' }
 }
+
+/**
+ * Prazo OFICIAL de cada estado não-final, a partir das datas de fato (último dia em que o estado ainda vale).
+ * Mesmos limites que a regra aplica acima; o motor grava este valor em `prazoAte` do log.
+ */
+export function prazoDe(c: EntradaProva, estado: EstadoProva): string {
+  switch (estado) {
+    case 'guardada':
+      return somarDias(c.gravadoEm ?? c.solicitadoEm, PRAZO_GUARDADA_DIAS)
+    case 'ancorando':
+      return somarDias(c.ancoraEnviadaEm ?? c.gravadoEm ?? c.solicitadoEm, PRAZO_ANCORA_DIAS)
+    default:
+      return somarDias(c.solicitadoEm, PRAZO_CAPTURA_DIAS)
+  }
+}

@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { validarEntrada } from '@maquina/core'
 import { produtos } from './registro.gerado'
 import { publico, hojeBR } from './publico'
+import { esteira } from './esteira'
 import type { Env } from './env'
 
 export { CasoWorkflow } from './workflow'
@@ -30,6 +31,7 @@ api.get('/p', (c) =>
       estados: p.estados,
       motivos: p.motivos,
       criterioDeMorte: p.criterioDeMorte,
+      preco: p.preco ?? null,
       naoFaremos: p.naoFaremos,
     })),
   ),
@@ -99,6 +101,8 @@ api.get('/interesses', async (c) => {
   const { results } = await c.env.DB.prepare('SELECT id, produto, contato, motivo, em FROM interesses ORDER BY id DESC LIMIT 200').all()
   return c.json({ interesses: results })
 })
+
+api.route('/', esteira)
 
 app.route('/api', api)
 

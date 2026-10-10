@@ -37,6 +37,7 @@ export const funil = defineProduto<EstadoFunil, MotivoFunil, EntradaFunil>({
   },
   regra,
   criterioDeMorte: { prazoDias: PRAZO_DIAS, metrica: 'conversas_reais', minimo: MIN_CONVERSAS },
+  preco: { modelo: 'interno', gratis: 'Uso interno: decide se uma ideia vive ou morre.', custoPorCasoCentavos: 0 },
   naoFaremos: [
     'Não decide com IA: o veredito é regra pura.',
     'Não estende prazo por simpatia: prazo vencido sem sinal é morte.',

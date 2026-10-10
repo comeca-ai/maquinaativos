@@ -1,16 +1,49 @@
 // Vitrine de marca: landing de conversão, entrada por link mágico e "Minhas provas".
 // Genérica: todo texto de marca vem do produto (captura.marca). O framework só desenha e chama a API.
+// Desenho v2 ("manchete, papel, carimbo"): conta sem senha, link enviado com atalho para o e-mail, Minhas provas.
 import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio, enviarComProgresso, origemDaVisita, cabecalhoOrigem } from './base.js'
 
 const app = document.getElementById('app')
 
 /* ---------- utilidades ---------- */
+const BR = { timeZone: 'America/Sao_Paulo' }
 const tamanho = (b) => (b >= 1048576 ? `${(b / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
-const dataHora = (iso) => new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' (Brasília)'
-const dataCarimbo = (d) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short', year: 'numeric' }).replace(/\./g, '').toUpperCase()
+const dataHora = (iso) => new Date(iso).toLocaleString('pt-BR', { ...BR, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' (Brasília)'
+const dataCurta = (iso) => new Date(iso).toLocaleString('pt-BR', { ...BR, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace(',', '')
+const dataCarimbo = (d) => d.toLocaleDateString('pt-BR', { ...BR, day: '2-digit', month: 'short', year: 'numeric' }).replace(/\./g, '').toUpperCase()
 const hashCurto = (s) => `${s.slice(0, 16)}…${s.slice(-8)}`
 const baixarTexto = (nomeArq, texto) => { const u = URL.createObjectURL(new Blob([texto], { type: 'text/plain' })); const a = h('a', { href: u, download: nomeArq }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000) }
 const linkInterno = (href, ...filhos) => h('a', { href, 'data-link': true }, ...filhos)
+const linkBotao = (href, texto, classe = 'v-botao') => h('a', { href, 'data-link': true, class: classe }, texto)
+const rotaMinhas = (nome) => `/minhas-provas${nome ? `?p=${encodeURIComponent(nome)}` : ''}`
+const rotaEntrar = (nome) => `/entrar${nome ? `?p=${encodeURIComponent(nome)}` : ''}`
+const semNulos = (xs) => xs.flat().filter((x) => x != null && x !== false)
+const anexar = (el, ...xs) => el.append(...semNulos(xs))
+const trocar = (el, ...xs) => el.replaceChildren(...semNulos(xs))
+const mascarar = (email) => { const [u, d] = email.trim().split('@'); return u && d ? `${u[0]}••••••@${d}` : email }
+
+/** Atalho para a caixa de entrada dos provedores mais comuns (só abre a caixa; não lê nada). */
+const PROVEDORES = [
+  [/^(gmail|googlemail)\.com$/, 'Gmail', 'https://mail.google.com/mail/u/0/#inbox'],
+  [/^(outlook|hotmail|live|msn)\.(com|com\.br)$/, 'Outlook', 'https://outlook.live.com/mail/0/'],
+  [/^(yahoo|ymail)\.(com|com\.br)$/, 'Yahoo Mail', 'https://mail.yahoo.com/'],
+  [/^(icloud|me|mac)\.com$/, 'iCloud Mail', 'https://www.icloud.com/mail'],
+]
+
+const TIPOS = [['image/', 'print ou foto'], ['video/', 'vídeo'], ['application/pdf', 'PDF'], ['text/plain', 'texto']]
+const tiposLegiveis = (mimes) => {
+  const nomes = TIPOS.filter(([t]) => mimes.some((m) => m === t || m.startsWith(t))).map(([, n]) => n)
+  return nomes.length > 1 ? `${nomes.slice(0, -1).join(', ')} ou ${nomes.at(-1)}` : nomes[0] || 'arquivo'
+}
+
+const ERRO_LINK = {
+  email_invalido: 'Esse e-mail não parece certo.',
+  muitas_tentativas: 'Muitos pedidos seguidos. Espere alguns minutos e tente de novo.',
+  login_indisponivel: 'O acesso por e-mail ainda não está disponível. Guarde o código.',
+  email_falhou: 'Não conseguimos enviar agora. Tente de novo em instantes.',
+  prova_nao_encontrada: 'Não achamos essa prova para guardar na conta.',
+  verificacao_falhou: 'Não conseguimos confirmar que você é uma pessoa. Recarregue a página.',
+}
 
 /** Contador anônimo do funil (agregado por dia no servidor; sem cookie, sem IP). */
 function evento(nome, etapa, umaVezPorSessao = false) {
@@ -26,16 +59,25 @@ async function estadoConta() {
   return r.ok ? r.j : { logado: false, loginDisponivel: false }
 }
 
-/** Topo e rodapé da marca (substitui os da máquina). */
-function vestir(nome, cfg, casa) {
-  const m = cfg.marca
+/** Nome da marca com a parte destacada no vermelho do carimbo (ex.: Tinha <Print>). */
+const nomeDaMarca = (m) => (m.destaque && m.nome.endsWith(m.destaque) && m.nome !== m.destaque
+  ? [m.nome.slice(0, m.nome.length - m.destaque.length), h('span', { class: 'v-destaque' }, m.destaque)]
+  : [m.nome])
+
+/** Topo e rodapé da marca (substitui os da máquina). O topo muda com a conta: Entrar, ou Minhas provas e Sair. */
+function vestir(nome, cfg, casa, conta) {
   document.body.classList.add('vitrine')
+  if (!cfg) return
+  const m = cfg.marca
   document.title = `${m.nome} — ${m.promessa}`
-  const topo = document.querySelector('.topo')
-  topo.replaceChildren(linkInterno(casa, m.nome), linkInterno(`/minhas-provas?p=${encodeURIComponent(nome)}`, 'Minhas provas'))
-  topo.firstChild.className = 'v-logo'
-  topo.lastChild.className = 'v-nav'
-  document.querySelector('.rodape').replaceChildren(h('p', {}, h('span', {}, `${m.nome} preserva arquivos e carimba a data.`), h('span', {}, 'Não é aconselhamento jurídico.'), linkInterno(`/minhas-provas?p=${encodeURIComponent(nome)}`, 'Minhas provas')))
+  const sair = async () => { await post('/pub/conta/sair', {}); location.assign(casa) }
+  const nav = h('nav', { class: 'v-nav', 'aria-label': 'Conta' },
+    linkInterno(rotaMinhas(nome), 'Minhas provas'),
+    conta?.logado ? h('button', { type: 'button', class: 'v-link', onclick: sair }, 'Sair')
+      : conta?.loginDisponivel ? linkBotao(rotaEntrar(nome), 'Entrar', 'v-topo-entrar') : null)
+  const logo = h('a', { href: casa, 'data-link': true, class: 'v-logo' }, ...nomeDaMarca(m))
+  document.querySelector('.topo').replaceChildren(logo, nav)
+  document.querySelector('.rodape').replaceChildren(h('p', {}, h('span', {}, `${m.nome} preserva arquivos e carimba a data.`), h('span', {}, 'Não é aconselhamento jurídico.'), linkInterno(rotaMinhas(nome), 'Minhas provas')))
 }
 
 function recibo({ id, nome, bytes, sha256, recebidoEm, carimbo, exemplo, bater }) {
@@ -52,25 +94,82 @@ function recibo({ id, nome, bytes, sha256, recebidoEm, carimbo, exemplo, bater }
       h('div', { class: 'v-carimbo' + (bater ? ' bate' : ''), 'aria-hidden': 'true' }, h('b', {}, 'Guardado'), h('span', {}, dataCarimbo(quando)))))
 }
 
-/** Formulário de e-mail do link mágico. `vincular` = { id, chave } de uma prova recém-guardada. */
-function formLink(nome, { titulo, texto, vincular, rotulo = 'Enviar link de acesso', turnstile } = {}) {
-  const email = h('input', { type: 'email', id: 'email-link', name: 'email', autocomplete: 'email', inputmode: 'email', required: true, placeholder: 'voce@email.com', 'aria-label': 'Seu e-mail' })
+/* ---------- link mágico ---------- */
+
+/** Depois de pedir o link: confira o e-mail, atalho para a caixa de entrada, reenviar com espera e trocar de e-mail. */
+function painelEnviado({ email, conta, reenviar, outro }) {
+  const agora = new Date()
+  const quando = `${agora.toLocaleDateString('pt-BR', { ...BR, day: '2-digit', month: 'short' }).replace('.', '')} · ${agora.toLocaleTimeString('pt-BR', { ...BR, hour: '2-digit', minute: '2-digit' })}`
+  const provedor = PROVEDORES.find(([re]) => re.test(email.split('@')[1]?.toLowerCase() || ''))
   const msg = h('p', { class: 'v-status', role: 'status' })
-  const botao = h('button', { type: 'submit', class: 'v-botao tinta' }, rotulo)
-  const form = h('form', { class: 'v-conta', onsubmit: async (e) => {
+  const botaoReenviar = h('button', { type: 'button', class: 'v-link' })
+  let restam = 60, relogio = null
+  const contar = () => {
+    clearTimeout(relogio)
+    if (!botaoReenviar.isConnected && restam < 60) return
+    if (restam > 0) { botaoReenviar.disabled = true; botaoReenviar.textContent = `Reenviar em ${Math.floor(restam / 60)}:${String(restam % 60).padStart(2, '0')}`; restam -= 1; relogio = setTimeout(contar, 1000) }
+    else { botaoReenviar.disabled = false; botaoReenviar.textContent = 'Reenviar o link' }
+  }
+  botaoReenviar.onclick = async () => {
+    botaoReenviar.disabled = true; msg.className = 'v-status'; msg.textContent = 'Reenviando…'
+    const r = await reenviar()
+    if (r.ok) msg.textContent = 'Mandamos outro link. Use o mais recente.'
+    else { msg.className = 'v-status erro'; msg.textContent = ERRO_LINK[r.j.erro] || 'Não foi possível reenviar agora.' }
+    restam = 60; contar()
+  }
+  const titulo = h('h2', { tabindex: '-1' }, 'Confira seu e-mail.')
+  const fato = (rotulo, valor) => h('div', {}, h('dt', {}, rotulo), h('dd', {}, valor))
+  const painel = h('div', { class: 'v-enviado' },
+    h('div', { class: 'v-carimbo bate', 'aria-hidden': 'true' }, h('b', {}, 'Enviado'), h('span', {}, quando.toUpperCase())),
+    titulo,
+    h('p', { class: 'v-lead' }, 'Mandamos o link para ', h('strong', { class: 'mono' }, mascarar(email)), '. Abra e toque em ', h('strong', {}, 'Abrir meu acesso'), '.'),
+    h('dl', { class: 'v-tres' }, fato('Vale', `${conta?.linkMinutos || 15} minutos`), fato('Funciona', 'uma vez só'), fato('Abre em', 'qualquer aparelho')),
+    provedor ? h('a', { class: 'v-botao tinta', href: provedor[2], target: '_blank', rel: 'noopener noreferrer' }, `Abrir o ${provedor[1]}`) : null,
+    h('div', { class: 'v-naochegou' },
+      h('p', {}, h('strong', {}, 'Não chegou?')),
+      h('p', {}, `Olhe o spam e a aba Promoções.${conta?.remetente ? ` O remetente é ${conta.remetente}.` : ''}`),
+      h('div', { class: 'v-acoes' }, botaoReenviar, outro ? h('button', { type: 'button', class: 'v-link', onclick: () => { clearTimeout(relogio); outro() } }, 'Usar outro e-mail') : null),
+      msg))
+  contar()
+  queueMicrotask(() => titulo.focus({ preventScroll: false }))
+  return painel
+}
+
+/**
+ * Formulário do link mágico. `vincular` = { id, chave } de uma prova recém-guardada.
+ * variante 'grande' (página Entrar): rótulo visível e botão largo; 'compacta' (depois de guardar): campo e botão na mesma linha.
+ */
+function formLink(nome, { titulo, texto, vincular, rotulo = 'Mandar meu link', turnstile, conta, variante = 'grande', alvo } = {}) {
+  const idCampo = `email-${Math.random().toString(36).slice(2, 8)}`
+  const email = h('input', { type: 'email', id: idCampo, name: 'email', autocomplete: 'email', inputmode: 'email', required: true, placeholder: 'voce@exemplo.com' })
+  const msg = h('p', { class: 'v-status', role: 'status' })
+  const botao = h('button', { type: 'submit', class: variante === 'grande' ? 'v-botao' : 'v-botao tinta' }, rotulo)
+  const pedir = (endereco) => post('/pub/conta/link', { email: endereco, produto: nome, vincular, turnstile: turnstile?.() }, cabecalhoOrigem())
+  const form = h('form', { class: `v-conta ${variante}`, onsubmit: async (e) => {
     e.preventDefault(); botao.disabled = true; msg.className = 'v-status'; msg.textContent = 'Enviando…'
-    const r = await post('/pub/conta/link', { email: email.value, produto: nome, vincular, turnstile: turnstile?.() }, cabecalhoOrigem())
+    const endereco = email.value.trim()
+    const r = await pedir(endereco)
     botao.disabled = false
-    if (r.ok) { form.replaceChildren(h('h3', {}, 'Confira seu e-mail.'), h('p', {}, `Mandamos um link para ${email.value.trim()}. Ele vale ${r.j.minutos || 15} minutos e funciona uma vez só.`)); return }
+    if (r.ok) {
+      // Sem `alvo`, o formulário vira o painel; com `alvo` (página Entrar), a tela inteira vira o painel.
+      const onde = alvo || form
+      const original = [...onde.childNodes]
+      onde.replaceChildren(painelEnviado({ email: endereco, conta, reenviar: () => pedir(endereco), outro: () => { onde.replaceChildren(...original); msg.textContent = ''; email.focus() } }))
+      return
+    }
     msg.className = 'v-status erro'
-    msg.textContent = { email_invalido: 'Esse e-mail não parece certo.', muitas_tentativas: 'Muitos pedidos seguidos. Espere alguns minutos.', login_indisponivel: 'O acesso por e-mail ainda não está disponível. Guarde o código.', email_falhou: 'Não conseguimos enviar agora. Tente de novo em instantes.', prova_nao_encontrada: 'Não achamos essa prova para vincular.' }[r.j.erro] || 'Não foi possível enviar agora.'
+    msg.textContent = ERRO_LINK[r.j.erro] || 'Não foi possível enviar agora.'
   } },
-  titulo ? h('h3', {}, titulo) : null, texto ? h('p', {}, texto) : null,
-  h('div', { class: 'v-campo' }, email, botao), msg)
+  titulo ? h('h3', {}, titulo) : null,
+  variante === 'grande'
+    ? [texto ? h('p', {}, texto) : null, h('label', { for: idCampo }, 'Seu e-mail'), email, botao]
+    : [h('label', { for: idCampo, class: 'v-conta-texto' }, texto || 'Seu e-mail'), h('div', { class: 'v-campo' }, email, botao)],
+  msg)
   return form
 }
 
-function formCodigo(nome) {
+/* ---------- código de recuperação ---------- */
+function formCodigo(nome, { aoAchar } = {}) {
   const id = h('input', { type: 'text', id: 'rid', autocomplete: 'off', spellcheck: 'false', maxlength: 64 })
   const ch = h('input', { type: 'password', id: 'rch', autocomplete: 'off', maxlength: 128 })
   const msg = h('p', { class: 'v-status', role: 'status' }); const saida = h('div')
@@ -79,22 +178,58 @@ function formCodigo(nome) {
     const r = await post(`/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id.value.trim())}/estado`, { chave: ch.value.trim() })
     if (!r.ok) { msg.className = 'v-status erro'; msg.textContent = 'Identificador ou código não confere.'; return }
     const x = r.j
-    saida.replaceChildren(h('ul', { class: 'v-lista' }, itemProva(nome, { ...x, estado: x.caso?.estado }, ch.value.trim())))
+    saida.replaceChildren(h('ul', { class: 'v-lista v-provas' }, itemProva(nome, { ...x, estado: x.caso?.estado }, ch.value.trim())))
+    aoAchar?.()
   } }, h('label', { for: 'rid' }, 'Identificador'), id, h('label', { for: 'rch' }, 'Código de recuperação'), ch, h('div', {}, h('button', { type: 'submit', class: 'v-botao tinta' }, 'Ver minha prova')), msg, saida)
 }
 
+/** Logado: traz para a conta uma prova guardada antes, provando a posse com o código. */
+function formTrazer(nome, depois) {
+  const id = h('input', { type: 'text', id: 'tid', autocomplete: 'off', spellcheck: 'false', maxlength: 64 })
+  const ch = h('input', { type: 'password', id: 'tch', autocomplete: 'off', maxlength: 128 })
+  const msg = h('p', { class: 'v-status', role: 'status' })
+  const botao = h('button', { type: 'submit', class: 'v-botao tinta' }, 'Trazer para minha conta')
+  return h('form', { class: 'v-form', onsubmit: async (e) => {
+    e.preventDefault(); botao.disabled = true; msg.className = 'v-status'; msg.textContent = 'Conferindo…'
+    const r = await post('/pub/conta/vincular', { produto: nome, id: id.value.trim(), chave: ch.value.trim() })
+    botao.disabled = false
+    if (r.ok) return depois({ vinculada: true })
+    msg.className = 'v-status erro'
+    msg.textContent = r.status === 409 ? 'Esta prova já está em outra conta.' : r.status === 401 ? 'Sua sessão terminou. Entre de novo.' : 'Identificador ou código não confere.'
+  } }, h('label', { for: 'tid' }, 'Identificador'), id, h('label', { for: 'tch' }, 'Código de recuperação'), ch, h('div', {}, botao), msg)
+}
+
+/** Bloco recolhido no pé das telas de conta: "tem o código?" abre o formulário. */
+function blocoRecolhido(pergunta, acao, montar) {
+  const caixa = h('div', { class: 'v-rodape-tela' })
+  const abrir = () => { caixa.replaceChildren(h('h2', { class: 'v-sub-titulo' }, acao), montar()); caixa.querySelector('input')?.focus() }
+  caixa.append(h('p', {}, pergunta), h('button', { type: 'button', class: 'v-link forte', onclick: abrir }, acao))
+  return caixa
+}
+
+/* ---------- item de prova (Minhas provas e busca pelo código) ---------- */
+function etiqueta(p) {
+  if (p.vedado) return h('span', { class: 'v-etiqueta neutra' }, 'Indisponível')
+  if (p.otsAltura || p.ancora === 'confirmada') return h('span', { class: 'v-etiqueta' }, 'Preservada')
+  return h('span', { class: 'v-etiqueta espera' }, p.ancora === 'enviada' ? 'Aguardando' : 'Na fila')
+}
+function situacao(p) {
+  if (p.vedado) return 'Indisponível para download.'
+  if (p.otsAltura) return `Ancorada no Bitcoin, bloco nº ${Number(p.otsAltura).toLocaleString('pt-BR')}`
+  if (['falhou', 'recusada', 'preservada_sem_ancora'].includes(p.estado)) return ROTULO_ESTADO[p.estado]
+  if (p.ancora === 'enviada') return 'Carimbo enviado; o Bitcoin confirma em algumas horas'
+  return 'Guardada; o carimbo sai na próxima tentativa (até 1 hora)'
+}
 function itemProva(nome, p, chave) {
   const msg = h('p', { class: 'v-status', role: 'status' })
-  const situacao = p.otsAltura ? `Ancorado no Bitcoin, bloco ${p.otsAltura}` : p.ancora === 'nao_enviada' ? 'Guardado; carimbo na fila' : (ROTULO_ESTADO[p.estado] || 'Em andamento')
+  const produto = p.produto || nome
   return h('li', {},
-    h('strong', {}, p.nome),
-    h('span', { class: 'v-meta' }, `${dataHora(p.recebidoEm)} · ${tamanho(p.bytes)}`),
-    h('span', { class: 'v-meta' }, situacao),
-    h('span', { class: 'v-meta mono', title: p.sha256 }, hashCurto(p.sha256)),
-    p.vedado ? h('span', { class: 'v-meta erro' }, 'Indisponível para download.') :
-      h('div', { class: 'v-acoes' },
-        h('button', { type: 'button', class: 'v-botao tinta', onclick: () => baixarPacote(p.produto || nome, p.id, chave, msg) }, 'Baixar pacote (.zip)'),
-        h('button', { type: 'button', class: 'v-link', onclick: () => abrirRelatorio(p.produto || nome, p.id, chave) }, 'Ver relatório')),
+    h('div', { class: 'v-item-topo' }, h('strong', { title: p.nome }, p.nome), etiqueta(p)),
+    h('span', { class: 'v-meta mono' }, `${tamanho(p.bytes)} · ${dataCurta(p.recebidoEm)}`),
+    h('span', { class: 'v-meta' }, situacao(p)),
+    p.vedado ? null : h('div', { class: 'v-acoes' },
+      h('button', { type: 'button', class: 'v-link forte', onclick: () => abrirRelatorio(produto, p.id, chave) }, 'Ver relatório'),
+      h('button', { type: 'button', class: 'v-link', onclick: () => baixarPacote(produto, p.id, chave, msg) }, 'Baixar pacote (.zip)')),
     msg)
 }
 
@@ -102,11 +237,12 @@ function itemProva(nome, p, chave) {
 export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   const m = cfg.marca
   const casa = raiz ? '/' : `/${encodeURIComponent(nome)}`
-  vestir(nome, cfg, casa)
   const conta = await estadoConta()
+  vestir(nome, cfg, casa, conta)
   const maxMB = Math.floor(cfg.maxBytes / 1048576)
   let tokenTurnstile = null
   const podeTela = Boolean(navigator.mediaDevices?.getDisplayMedia) && !matchMedia('(pointer: coarse)').matches
+  const planoUnico = m.planos?.length === 1 ? m.planos[0] : null
 
   /* ferramenta */
   const aceite = h('input', { type: 'checkbox', id: 'aceite' })
@@ -116,8 +252,22 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   const principal = h('button', { type: 'button', class: 'v-botao', onclick: () => { if (consentido()) arquivo.click() } }, m.chamada || 'Escolher arquivo')
   const barra = h('i'); const progresso = h('div', { class: 'v-progresso', hidden: true, 'aria-hidden': 'true' }, barra)
   const msg = h('p', { class: 'v-status', role: 'status', 'aria-live': 'polite' })
-  const alt = podeTela ? h('p', { class: 'v-alt' }, 'Ou ', h('button', { type: 'button', class: 'v-link', onclick: () => printDaTela() }, 'tire um print desta tela'), ' · ', h('button', { type: 'button', class: 'v-link', onclick: (e) => gravarTela(e.target) }, 'grave a tela'), ` · arraste o arquivo aqui (até ${maxMB} MB)`) : h('p', { class: 'v-alt' }, `Funciona no celular: foto, print, vídeo, PDF ou texto, até ${maxMB} MB. O pacote fica com você.`)
-  const ferramenta = h('div', { class: 'v-ferramenta', id: 'guardar' }, consentimento, principal, alt, progresso, msg, h('p', { class: 'v-aviso' }, cfg.aviso), arquivo)
+  const alt = podeTela
+    ? h('div', { class: 'v-alt' },
+      h('button', { type: 'button', class: 'v-link', onclick: () => printDaTela() }, 'Tirar print da tela'),
+      h('button', { type: 'button', class: 'v-link', onclick: (e) => gravarTela(e.target) }, 'Gravar a tela'),
+      h('span', {}, 'ou arraste o arquivo aqui'))
+    : h('p', { class: 'v-alt' }, 'No celular: escolha o print, a foto, o vídeo ou o PDF que já está no aparelho.')
+  const selo = planoUnico ? h('div', { class: 'v-selo', 'aria-hidden': 'true' }, h('b', {}, planoUnico.preco), h('span', {}, planoUnico.unidade)) : null
+  const ferramenta = h('div', { class: 'v-ferramenta' + (selo ? ' com-selo' : ''), id: 'guardar' },
+    selo,
+    h('p', { class: 'v-passo' }, '1 · Autorize'), consentimento,
+    h('p', { class: 'v-passo' }, '2 · Envie'), principal, alt, progresso, msg,
+    h('p', { class: 'v-ferramenta-pe' }, `Até ${maxMB} MB · ${tiposLegiveis(cfg.tiposMime)} · sem cadastro`),
+    h('p', { class: 'v-aviso' }, cfg.aviso), arquivo)
+  const jaGuardou = conta.logado
+    ? h('p', { class: 'v-ja' }, 'Você está conectado. O que guardar aqui vai direto para ', linkInterno(rotaMinhas(nome), 'Minhas provas'), '.')
+    : conta.loginDisponivel ? h('p', { class: 'v-ja' }, 'Já guardou antes? ', linkInterno(rotaEntrar(nome), 'Entre e veja suas provas')) : null
 
   function consentido() {
     if (aceite.checked) { consentimento.classList.remove('pedir'); return true }
@@ -188,27 +338,32 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   function mostrarResultado(r) {
     const status = h('p', { class: 'v-status', role: 'status' })
     const codigo = r.codigoDeRecuperacao
+    const chaveAcesso = r.naConta ? null : codigo
     const textoCodigo = `Identificador: ${r.id}\nCódigo de recuperação: ${codigo}\nSHA-256: ${r.sha256}\nRecebido em: ${r.recebidoEm}\n`
-    const caixaCodigo = r.naConta ? h('p', {}, 'Esta prova já está na sua conta, em ', linkInterno(`/minhas-provas?p=${encodeURIComponent(nome)}`, 'Minhas provas'), '.')
-      : h('div', { class: 'v-codigo' },
+    const acoes = h('div', { class: 'v-acoes' },
+      h('button', { type: 'button', class: 'v-botao', onclick: () => abrirRelatorio(nome, r.id, chaveAcesso) }, 'Ver relatório'),
+      h('button', { type: 'button', class: 'v-link', onclick: () => baixarPacote(nome, r.id, chaveAcesso, status) }, 'Baixar pacote (.zip)'),
+      h('button', { type: 'button', class: 'v-link', onclick: () => { ferramenta.replaceChildren(...original); aceite.checked = true; msg.textContent = '' } }, 'Guardar outro arquivo'))
+    const titulo = h('h2', { tabindex: '-1' }, 'Guardado.')
+    const corpo = r.naConta
+      ? [h('p', { class: 'v-lead' }, 'Já está em ', linkInterno(rotaMinhas(nome), 'Minhas provas'), '. Sem código para guardar: é só entrar pelo e-mail quando precisar.'),
+        acoes, status,
+        h('p', { class: 'v-aviso' }, 'O carimbo chega ao Bitcoin em algumas horas. Quando confirmar, o pacote e o relatório já trazem o número do bloco.')]
+      : [h('div', { class: 'v-codigo' },
         h('p', {}, h('strong', {}, 'Seu código de recuperação. '), 'Ele aparece só agora e não temos como recuperá-lo.'),
         h('output', {}, codigo),
         h('div', { class: 'v-acoes' },
           h('button', { type: 'button', class: 'v-link', onclick: async (e) => { try { await navigator.clipboard.writeText(textoCodigo); e.target.textContent = 'Copiado' } catch { e.target.textContent = 'Não deu para copiar; salve o .txt' } } }, 'Copiar'),
-          h('button', { type: 'button', class: 'v-link', onclick: () => baixarTexto(`codigo-${r.id}.txt`, textoCodigo) }, 'Salvar como .txt')))
-    const bloco = h('div', { class: 'v-resultado' },
-      h('h2', {}, 'Guardado.'),
+          h('button', { type: 'button', class: 'v-link', onclick: () => baixarTexto(`codigo-${r.id}.txt`, textoCodigo) }, 'Salvar como .txt'))),
+        acoes, status,
+        conta.loginDisponivel ? formLink(nome, { variante: 'compacta', titulo: 'Não quer depender do código?', texto: 'Guarde esta prova na sua conta. Você entra pelo e-mail, sem senha.', vincular: { id: r.id, chave: codigo }, rotulo: 'Guardar', turnstile: () => tokenTurnstile, conta }) : null]
+    const bloco = h('div', { class: 'v-resultado' }, titulo,
       recibo({ id: r.id, nome: r.nome, bytes: r.bytes, sha256: r.sha256, recebidoEm: r.recebidoEm, carimbo: r.ancora === 'enviada' ? 'enviado ao OpenTimestamps; a confirmação no Bitcoin costuma levar algumas horas' : 'na fila; tentamos de novo em até 1 hora', bater: true }),
-      caixaCodigo,
-      h('div', { class: 'v-acoes' },
-        h('button', { type: 'button', class: 'v-botao', onclick: () => baixarPacote(nome, r.id, r.naConta ? null : codigo, status) }, 'Baixar pacote (.zip)'),
-        h('button', { type: 'button', class: 'v-botao tinta', onclick: () => abrirRelatorio(nome, r.id, r.naConta ? null : codigo) }, 'Ver relatório'),
-        h('button', { type: 'button', class: 'v-link', onclick: () => { ferramenta.replaceChildren(...original); aceite.checked = true; msg.textContent = '' } }, 'Guardar outro arquivo')),
-      status,
-      !r.naConta && conta.loginDisponivel ? formLink(nome, { titulo: 'Não quer depender do código?', texto: 'Receba um acesso no seu e-mail. Esta prova fica guardada na sua conta, e você baixa o pacote quando quiser. Não guardamos o seu e-mail, só uma marca cifrada dele.', vincular: { id: r.id, chave: codigo }, rotulo: 'Guardar na minha conta', turnstile: () => tokenTurnstile }) : null)
+      ...corpo)
     const original = [...ferramenta.childNodes]
     ferramenta.replaceChildren(bloco)
     ferramenta.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    titulo.focus({ preventScroll: true })
   }
 
   /* recibo de exemplo (dados reais de um arquivo de exemplo, calculados aqui) */
@@ -218,12 +373,12 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
 
   /* seções */
   const heroi = h('section', { class: 'v-heroi' },
-    h('div', {}, h('p', { class: 'v-sobre' }, cfg.titulo), h('h1', { class: 'v-manchete' }, m.promessa), h('p', { class: 'v-sub' }, cfg.subtitulo), ferramenta),
+    h('div', {}, h('p', { class: 'v-sobre' }, cfg.titulo), h('h1', { class: 'v-manchete' }, m.promessa), h('p', { class: 'v-sub' }, cfg.subtitulo), ferramenta, jaGuardou),
     h('div', { class: 'v-lado' }, reciboExemplo,
       h('ul', { class: 'v-fatos' },
         h('li', {}, 'Cofre privado na Cloudflare, sem link público'),
         h('li', {}, 'Data carimbada no Bitcoin via OpenTimestamps'),
-        h('li', {}, 'Pacote que você confere sem depender da gente'))))
+        h('li', {}, 'Relatório e pacote que você confere sem depender da gente'))))
 
   const cenas = m.cenas?.length ? h('section', { class: 'v-secao v-cenas' }, h('h2', {}, 'Quando você vai precisar'),
     h('ol', {}, m.cenas.map((c, i) => h('li', {}, h('span', { class: 'v-num' }, String(i + 1).padStart(2, '0')), h('div', {}, h('h3', {}, c.titulo), h('p', {}, c.texto)))))) : null
@@ -235,6 +390,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
       h('div', {}, h('dt', {}, 'seu arquivo'), h('dd', {}, 'Byte a byte, do jeito que chegou.')),
       h('div', {}, h('dt', {}, 'manifesto.json'), h('dd', {}, 'A impressão digital (SHA-256), o tamanho, o tipo e a hora em que o nosso servidor recebeu.')),
       h('div', {}, h('dt', {}, 'prova.ots'), h('dd', {}, 'O carimbo OpenTimestamps, que amarra o manifesto a um bloco do Bitcoin. Ninguém consegue reescrever essa data depois.')),
+      h('div', {}, h('dt', {}, 'RELATORIO.html'), h('dd', {}, 'Tudo o que o cofre registrou, para ler, imprimir ou anexar. Também abre direto pelo botão "Ver relatório".')),
       h('div', {}, h('dt', {}, 'LEIA-ME.txt'), h('dd', {}, 'O passo a passo para conferir tudo com ferramentas abertas.'))))
 
   const como = h('section', { class: 'v-secao' }, h('h2', {}, 'Como funciona'),
@@ -254,21 +410,30 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
         h('p', { class: 'v-ressalva' }, m.baseLegal.ressalva))
     : h('section', { class: 'v-secao v-limites', id: 'limites' }, h('h2', {}, 'O que a gente não faz'), h('ul', {}, m.limites.map((x) => h('li', {}, x))))
 
-  // Um plano só (ex.: lançamento para testar mercado): título no singular, cartão largo e botão que leva à ferramenta.
-  const unico = m.planos?.length === 1
-  const planos = m.planos?.length ? h('section', { class: 'v-secao v-planos', id: 'planos' }, h('h2', {}, unico ? 'Quanto custa' : 'Planos'),
-    h('div', { class: 'v-planos-grade' + (unico ? ' unico' : '') }, m.planos.map((p) => h('div', { class: 'v-plano' + (p.destaque ? ' destaque' : '') },
-      h('h3', {}, p.nome), h('p', { class: 'v-preco' }, h('strong', {}, p.preco), h('span', {}, ` ${p.unidade}`)),
-      h('ul', {}, p.inclui.map((x) => h('li', {}, x))),
-      unico ? h('button', { type: 'button', class: 'v-botao', onclick: () => irParaFerramenta() }, m.chamada || 'Guardar agora') : null))),
-    m.planosNota ? h('p', { class: 'v-planos-nota' }, m.planosNota) : null) : null
+  // Um plano só (lançamento): preço em tipografia grande e a lista do que inclui; vários planos: a grade.
+  const planos = planoUnico
+    ? h('section', { class: 'v-secao v-preco-unico', id: 'planos' },
+      h('div', { class: 'v-preco-cab' }, h('p', { class: 'v-sobre' }, 'Quanto custa'), h('p', { class: 'v-preco-grande' }, planoUnico.preco), h('p', { class: 'v-preco-unidade' }, planoUnico.unidade)),
+      h('div', { class: 'v-preco-corpo' }, h('ul', {}, planoUnico.inclui.map((x) => h('li', {}, x))), m.planosNota ? h('p', { class: 'v-planos-nota' }, m.planosNota) : null))
+    : m.planos?.length ? h('section', { class: 'v-secao v-planos', id: 'planos' }, h('h2', {}, 'Planos'),
+      h('div', { class: 'v-planos-grade' }, m.planos.map((p) => h('div', { class: 'v-plano' + (p.destaque ? ' destaque' : '') },
+        h('h3', {}, p.nome), h('p', { class: 'v-preco' }, h('strong', {}, p.preco), h('span', {}, ` ${p.unidade}`)),
+        h('ul', {}, p.inclui.map((x) => h('li', {}, x)))))),
+      m.planosNota ? h('p', { class: 'v-planos-nota' }, m.planosNota) : null) : null
+
+  // Benefícios da conta: só com o login ligado (a página não promete o que não funciona) e para quem ainda não entrou.
+  const contaSecao = m.conta && conta.loginDisponivel && !conta.logado
+    ? h('section', { class: 'v-conta-faixa', id: 'conta' },
+      h('div', { class: 'v-conta-cab' }, h('h2', {}, m.conta.titulo), h('p', {}, m.conta.texto), linkBotao(rotaEntrar(nome), m.conta.chamada || 'Entrar com meu e-mail')),
+      h('ol', { class: 'v-beneficios' }, m.conta.beneficios.map((b, i) => h('li', {}, h('span', { class: 'v-num' }, String(i + 1).padStart(2, '0')), h('strong', {}, b.titulo), h('span', {}, b.texto)))))
+    : null
 
   const irParaFerramenta = () => { ferramenta.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (ferramenta.contains(aceite)) aceite.focus({ preventScroll: true }) }
   const fechamento = h('section', { class: 'v-fechamento' }, h('p', {}, m.fechamento || m.promessa), h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
   const fixa = h('div', { class: 'v-fixa', hidden: true }, h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
-  app.replaceChildren(heroi, cenas, pacote, planos, como, perguntas, limites, fechamento, fixa)
+  trocar(app, heroi, cenas, pacote, planos, contaSecao, como, perguntas, limites, fechamento, fixa)
   evento(nome, 'visita', true)
 
   if ('IntersectionObserver' in window) {
@@ -296,54 +461,94 @@ async function carregarMarca(nome) {
   return r.ok && r.j.marca ? r.j : null
 }
 
+/** "Entre sem senha" (ou, com o login desligado, só o código de recuperação). */
+function telaEntrar(nome, pagina, conta) {
+  pagina.classList.add('v-tela')
+  if (conta.loginDisponivel) {
+    anexar(pagina,
+      h('p', { class: 'v-sobre' }, 'Minhas provas'),
+      h('h1', {}, 'Entre sem senha.'),
+      h('p', { class: 'v-lead' }, `Digite seu e-mail. Mandamos um link que vale ${conta.linkMinutos || 15} minutos e funciona uma vez só.`),
+      formLink(nome, { variante: 'grande', rotulo: 'Mandar meu link', conta, alvo: pagina }),
+      h('p', { class: 'v-nota' }, 'Seu e-mail não fica guardado em texto. Guardamos só uma marca cifrada dele, para reconhecer você na próxima vez.'),
+      nome ? blocoRecolhido('Guardou sem entrar e tem o código?', 'Abrir com o código de recuperação', () => formCodigo(nome)) : null)
+    return
+  }
+  anexar(pagina, h('h1', {}, 'Minhas provas'), h('p', { class: 'v-lead' }, 'O acesso por e-mail ainda não está disponível. Abra sua prova com o identificador e o código de recuperação.'), nome ? formCodigo(nome) : null)
+}
+
 export async function paginaEntrar(nome) {
-  const cfg = await carregarMarca(nome)
-  if (cfg) vestir(nome, cfg, `/${encodeURIComponent(nome)}`)
-  else document.body.classList.add('vitrine')
+  const [cfg, conta] = await Promise.all([carregarMarca(nome), estadoConta()])
+  vestir(nome, cfg, `/${encodeURIComponent(nome || '')}`, conta)
   // O token vem no fragmento; tiramos da barra de endereço na hora (não fica no histórico nem em print de tela).
   const token = new URLSearchParams(location.hash.slice(1)).get('t')
   if (token) history.replaceState(null, '', location.pathname + location.search)
-  const pagina = h('section', { class: 'v-pagina' })
+  const pagina = h('section', { class: 'v-pagina v-tela' })
   app.replaceChildren(pagina)
 
-  if (token) {
-    const msg = h('p', { class: 'v-status', role: 'status' })
-    const botao = h('button', { type: 'button', class: 'v-botao', onclick: async () => {
-      botao.disabled = true; msg.className = 'v-status'; msg.textContent = 'Entrando…'
-      const r = await post('/pub/conta/entrar', { token }, cabecalhoOrigem())
-      if (r.ok) { history.replaceState(null, '', `/minhas-provas${nome ? `?p=${encodeURIComponent(nome)}` : ''}`); return paginaMinhasProvas(nome, { vinculada: r.j.vinculada }) }
-      botao.disabled = false
-      msg.className = 'v-status erro'; msg.textContent = 'Este link venceu ou já foi usado. Peça outro abaixo.'
-      pagina.append(h('hr', { class: 'v-separador' }), formLink(nome, { titulo: 'Receber um link novo' }))
-    } }, 'Entrar')
-    pagina.append(h('h1', {}, 'Entrar'), h('p', {}, 'Toque no botão para abrir sua conta neste aparelho.'), botao, msg)
-    return
+  if (!token) {
+    if (!conta.logado) return telaEntrar(nome, pagina, conta)
+    history.replaceState(null, '', rotaMinhas(nome))
+    return paginaMinhasProvas(nome)
   }
-  return paginaMinhasProvas(nome)
+
+  const msg = h('p', { class: 'v-status', role: 'status' })
+  const vencido = () => {
+    trocar(pagina,
+      h('div', { class: 'v-carimbo neutro', 'aria-hidden': 'true' }, h('b', {}, 'Vencido')),
+      h('h1', {}, 'Esse link já foi usado ou venceu.'),
+      h('p', { class: 'v-lead' }, `Cada link vale ${conta.linkMinutos || 15} minutos e funciona uma vez só. Peça outro: chega em instantes.`),
+      conta.loginDisponivel ? formLink(nome, { variante: 'grande', rotulo: 'Pedir outro link', conta, alvo: pagina }) : null,
+      h('div', { class: 'v-rodape-tela' }, h('p', {}, 'O que você guardou continua no cofre. Nada se perde quando um link vence.')))
+    pagina.querySelector('input')?.focus()
+  }
+  const botao = h('button', { type: 'button', class: 'v-botao', onclick: async () => {
+    botao.disabled = true; msg.className = 'v-status'; msg.textContent = 'Entrando…'
+    const r = await post('/pub/conta/entrar', { token }, cabecalhoOrigem())
+    if (r.ok) { history.replaceState(null, '', rotaMinhas(nome)); return paginaMinhasProvas(nome, { vinculada: r.j.vinculada }) }
+    if (r.status === 410) return vencido()
+    botao.disabled = false; msg.className = 'v-status erro'; msg.textContent = 'Não foi possível entrar agora. Tente de novo.'
+  } }, 'Entrar')
+  anexar(pagina,
+    h('p', { class: 'v-sobre' }, 'Seu acesso'),
+    h('h1', {}, 'Quase lá.'),
+    h('p', { class: 'v-lead' }, 'Toque em Entrar para abrir suas provas neste aparelho.'),
+    botao,
+    h('p', { class: 'v-nota mono' }, `Você fica conectado por ${conta.sessaoDias || 30} dias neste aparelho.`),
+    msg,
+    h('div', { class: 'v-rodape-tela' },
+      h('p', {}, h('strong', {}, 'Por que um toque a mais?')),
+      h('p', {}, 'Alguns serviços de e-mail abrem os links sozinhos para procurar vírus. Com o toque, quem entra é você, não o robô.')))
+  botao.focus()
 }
 
 /* ---------- minhas provas ---------- */
 export async function paginaMinhasProvas(nome, { vinculada = false } = {}) {
-  const cfg = await carregarMarca(nome)
-  if (cfg) vestir(nome, cfg, `/${encodeURIComponent(nome)}`)
-  else document.body.classList.add('vitrine')
-  const conta = await estadoConta()
-  const pagina = h('section', { class: 'v-pagina' })
+  const [cfg, conta] = await Promise.all([carregarMarca(nome), estadoConta()])
+  const casa = `/${encodeURIComponent(nome || '')}`
+  vestir(nome, cfg, casa, conta)
+  const pagina = h('section', { class: 'v-pagina v-tela' })
   app.replaceChildren(pagina)
-
-  if (!conta.logado) {
-    pagina.append(h('h1', {}, 'Minhas provas'))
-    if (conta.loginDisponivel) pagina.append(h('p', {}, 'Entre com o seu e-mail para ver as provas guardadas na sua conta. Mandamos um link; não tem senha.'), formLink(nome))
-    else pagina.append(h('p', {}, 'O acesso por e-mail ainda não está disponível. Use o identificador e o código de recuperação da sua prova.'))
-    if (nome) pagina.append(h('hr', { class: 'v-separador' }), h('h2', { class: 'v-sub-titulo' }, 'Tenho o código de recuperação'), formCodigo(nome))
-    return
-  }
+  if (!conta.logado) return telaEntrar(nome, pagina, conta)
 
   const r = await get('/pub/conta/provas')
   const provas = r.ok ? r.j.provas : []
-  const sair = h('button', { type: 'button', class: 'v-link', onclick: async () => { await post('/pub/conta/sair', {}); paginaMinhasProvas(nome) } }, 'Sair desta conta')
-  pagina.append(h('h1', {}, 'Minhas provas'),
-    vinculada ? h('p', {}, 'Pronto. A prova que você acabou de guardar agora está na sua conta.') : h('p', {}, provas.length ? 'Baixe o pacote de qualquer prova quando precisar.' : 'Nenhuma prova nesta conta ainda.'),
-    provas.length ? h('ul', { class: 'v-lista' }, provas.map((p) => itemProva(nome, p, null))) : linkInterno(nome ? `/${encodeURIComponent(nome)}` : '/', 'Guardar a primeira prova'),
-    h('p', {}, sair))
+  const n = provas.length
+  const trazer = nome ? blocoRecolhido('Guardou antes, sem entrar?', 'Trazer para cá com o código de recuperação', () => formTrazer(nome, (o) => paginaMinhasProvas(nome, o))) : null
+  anexar(pagina,
+    h('h1', {}, 'Minhas provas'),
+    h('p', { class: 'v-nota mono' }, n ? `${n} ${n > 1 ? 'provas' : 'prova'} · conectado neste aparelho` : 'conectado neste aparelho'),
+    vinculada ? h('p', { class: 'v-ok', role: 'status' }, 'Pronto. A prova agora está na sua conta.') : null)
+  if (n) {
+    anexar(pagina,
+      linkBotao(casa, 'Guardar nova prova'),
+      h('ul', { class: 'v-lista v-provas' }, provas.map((p) => itemProva(nome, p, null))),
+      h('p', { class: 'v-nota' }, 'O pacote de cada prova se confere sem depender de nós.'),
+      trazer)
+  } else {
+    anexar(pagina,
+      h('div', { class: 'v-vazio' }, h('p', { class: 'v-vazio-titulo' }, 'Nada guardado ainda.'), h('p', {}, 'Guarde o print agora. Ele aparece aqui, com o carimbo, assim que chegar ao cofre.')),
+      linkBotao(casa, 'Guardar a primeira prova'),
+      trazer)
+  }
 }

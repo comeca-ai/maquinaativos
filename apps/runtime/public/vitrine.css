@@ -58,7 +58,7 @@ body.vitrine .topo { display: flex; justify-content: space-between; align-items:
 .v-nav { display: flex; align-items: center; gap: 18px; font-weight: 500; font-size: 15px; }
 .v-nav .v-link { font-weight: 500; min-height: 44px; }
 .v-topo-entrar { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1.5px solid var(--tinta); border-radius: var(--raio); text-decoration: none; transition: background-color 120ms var(--expo), color 120ms var(--expo); }
-.v-topo-entrar:hover { background: var(--tinta); color: var(--papel); }
+@media (hover: hover) { .v-topo-entrar:hover { background: var(--tinta); color: var(--papel); } }
 .v-destaque { color: var(--carimbo); }
 body.vitrine .rodape { border-top: 1.5px solid var(--tinta); color: var(--tinta-2); font-size: 14px; text-align: left; padding: 20px var(--gutter); }
 body.vitrine .rodape p { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
@@ -99,6 +99,10 @@ div.v-alt .v-link { min-height: 44px; font-weight: 500; color: var(--tinta); }
 .v-link:disabled { color: var(--tinta-2); text-decoration: none; cursor: not-allowed; }
 .v-link.forte { font-weight: 600; color: var(--tinta); min-height: 44px; text-align: left; }
 .v-lead { margin: 0; font-size: 18px; line-height: 1.45; }
+.v-lead .mono { white-space: nowrap; }
+/* link com cara de botão: vence o `body.vitrine a { color: inherit }` */
+body.vitrine a.v-botao { color: var(--sobre-carimbo); }
+body.vitrine a.v-botao.tinta { color: var(--papel); }
 .v-aviso { font-size: 13px; line-height: 1.5; color: var(--tinta-2); margin: 16px 0 0; }
 .v-progresso { height: 4px; background: var(--papel-2); margin: 18px 0 0; overflow: hidden; }
 .v-progresso > i { display: block; height: 100%; width: 0; background: var(--tinta); transition: width 160ms linear; }
@@ -130,7 +134,7 @@ div.v-alt .v-link { min-height: 44px; font-weight: 500; color: var(--tinta); }
 .v-acoes { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
 .v-conta { display: grid; gap: 10px; border-top: 1.5px solid var(--tinta); padding-top: 16px; }
 .v-conta h3 { font-size: 17px; font-weight: 600; margin: 0; }
-.v-conta > p, .v-conta-texto { margin: 0; color: var(--tinta-2); font-size: 15px; }
+.v-conta > p, .v-conta-texto { margin: 0; color: var(--tinta-2); font-size: 15px; font-weight: 400; }
 .v-conta.grande { border-top: 0; padding-top: 0; margin-top: 28px; }
 .v-conta.grande > label { font-weight: 600; font-size: 15px; }
 .v-conta.grande input { box-sizing: border-box; width: 100%; min-height: 56px; padding: 0 16px; font: 400 18px/1 var(--texto); border: 1.5px solid var(--tinta); border-radius: var(--raio); background: var(--papel); color: var(--tinta); }

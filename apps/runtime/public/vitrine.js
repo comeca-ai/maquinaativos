@@ -17,6 +17,9 @@ const linkInterno = (href, ...filhos) => h('a', { href, 'data-link': true }, ...
 const linkBotao = (href, texto, classe = 'v-botao') => h('a', { href, 'data-link': true, class: classe }, texto)
 const rotaMinhas = (nome) => `/minhas-provas${nome ? `?p=${encodeURIComponent(nome)}` : ''}`
 const rotaEntrar = (nome) => `/entrar${nome ? `?p=${encodeURIComponent(nome)}` : ''}`
+const semNulos = (xs) => xs.flat().filter((x) => x != null && x !== false)
+const anexar = (el, ...xs) => el.append(...semNulos(xs))
+const trocar = (el, ...xs) => el.replaceChildren(...semNulos(xs))
 const mascarar = (email) => { const [u, d] = email.trim().split('@'); return u && d ? `${u[0]}••••••@${d}` : email }
 
 /** Atalho para a caixa de entrada dos provedores mais comuns (só abre a caixa; não lê nada). */
@@ -104,7 +107,7 @@ function painelEnviado({ email, conta, reenviar, outro }) {
   const contar = () => {
     clearTimeout(relogio)
     if (!botaoReenviar.isConnected && restam < 60) return
-    if (restam > 0) { botaoReenviar.disabled = true; botaoReenviar.textContent = `Reenviar em 0:${String(restam).padStart(2, '0')}`; restam -= 1; relogio = setTimeout(contar, 1000) }
+    if (restam > 0) { botaoReenviar.disabled = true; botaoReenviar.textContent = `Reenviar em ${Math.floor(restam / 60)}:${String(restam % 60).padStart(2, '0')}`; restam -= 1; relogio = setTimeout(contar, 1000) }
     else { botaoReenviar.disabled = false; botaoReenviar.textContent = 'Reenviar o link' }
   }
   botaoReenviar.onclick = async () => {
@@ -136,7 +139,7 @@ function painelEnviado({ email, conta, reenviar, outro }) {
  * Formulário do link mágico. `vincular` = { id, chave } de uma prova recém-guardada.
  * variante 'grande' (página Entrar): rótulo visível e botão largo; 'compacta' (depois de guardar): campo e botão na mesma linha.
  */
-function formLink(nome, { titulo, texto, vincular, rotulo = 'Mandar meu link', turnstile, conta, variante = 'grande' } = {}) {
+function formLink(nome, { titulo, texto, vincular, rotulo = 'Mandar meu link', turnstile, conta, variante = 'grande', alvo } = {}) {
   const idCampo = `email-${Math.random().toString(36).slice(2, 8)}`
   const email = h('input', { type: 'email', id: idCampo, name: 'email', autocomplete: 'email', inputmode: 'email', required: true, placeholder: 'voce@exemplo.com' })
   const msg = h('p', { class: 'v-status', role: 'status' })
@@ -148,8 +151,10 @@ function formLink(nome, { titulo, texto, vincular, rotulo = 'Mandar meu link', t
     const r = await pedir(endereco)
     botao.disabled = false
     if (r.ok) {
-      const original = [...form.childNodes]
-      form.replaceChildren(painelEnviado({ email: endereco, conta, reenviar: () => pedir(endereco), outro: () => { form.replaceChildren(...original); msg.textContent = ''; email.focus() } }))
+      // Sem `alvo`, o formulário vira o painel; com `alvo` (página Entrar), a tela inteira vira o painel.
+      const onde = alvo || form
+      const original = [...onde.childNodes]
+      onde.replaceChildren(painelEnviado({ email: endereco, conta, reenviar: () => pedir(endereco), outro: () => { onde.replaceChildren(...original); msg.textContent = ''; email.focus() } }))
       return
     }
     msg.className = 'v-status erro'
@@ -428,7 +433,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
 
   const fixa = h('div', { class: 'v-fixa', hidden: true }, h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
-  app.replaceChildren(heroi, cenas, pacote, planos, contaSecao, como, perguntas, limites, fechamento, fixa)
+  trocar(app, heroi, cenas, pacote, planos, contaSecao, como, perguntas, limites, fechamento, fixa)
   evento(nome, 'visita', true)
 
   if ('IntersectionObserver' in window) {
@@ -460,17 +465,16 @@ async function carregarMarca(nome) {
 function telaEntrar(nome, pagina, conta) {
   pagina.classList.add('v-tela')
   if (conta.loginDisponivel) {
-    pagina.append(
+    anexar(pagina,
       h('p', { class: 'v-sobre' }, 'Minhas provas'),
       h('h1', {}, 'Entre sem senha.'),
       h('p', { class: 'v-lead' }, `Digite seu e-mail. Mandamos um link que vale ${conta.linkMinutos || 15} minutos e funciona uma vez só.`),
-      formLink(nome, { variante: 'grande', rotulo: 'Mandar meu link', conta }),
-      h('p', { class: 'v-nota' }, 'Seu e-mail não fica guardado em texto. Guardamos só uma marca cifrada dele, para reconhecer você na próxima vez.'))
-    if (nome) pagina.append(blocoRecolhido('Guardou sem entrar e tem o código?', 'Abrir com o código de recuperação', () => formCodigo(nome)))
+      formLink(nome, { variante: 'grande', rotulo: 'Mandar meu link', conta, alvo: pagina }),
+      h('p', { class: 'v-nota' }, 'Seu e-mail não fica guardado em texto. Guardamos só uma marca cifrada dele, para reconhecer você na próxima vez.'),
+      nome ? blocoRecolhido('Guardou sem entrar e tem o código?', 'Abrir com o código de recuperação', () => formCodigo(nome)) : null)
     return
   }
-  pagina.append(h('h1', {}, 'Minhas provas'), h('p', { class: 'v-lead' }, 'O acesso por e-mail ainda não está disponível. Abra sua prova com o identificador e o código de recuperação.'))
-  if (nome) pagina.append(formCodigo(nome))
+  anexar(pagina, h('h1', {}, 'Minhas provas'), h('p', { class: 'v-lead' }, 'O acesso por e-mail ainda não está disponível. Abra sua prova com o identificador e o código de recuperação.'), nome ? formCodigo(nome) : null)
 }
 
 export async function paginaEntrar(nome) {
@@ -490,11 +494,11 @@ export async function paginaEntrar(nome) {
 
   const msg = h('p', { class: 'v-status', role: 'status' })
   const vencido = () => {
-    pagina.replaceChildren(
+    trocar(pagina,
       h('div', { class: 'v-carimbo neutro', 'aria-hidden': 'true' }, h('b', {}, 'Vencido')),
       h('h1', {}, 'Esse link já foi usado ou venceu.'),
       h('p', { class: 'v-lead' }, `Cada link vale ${conta.linkMinutos || 15} minutos e funciona uma vez só. Peça outro: chega em instantes.`),
-      conta.loginDisponivel ? formLink(nome, { variante: 'grande', rotulo: 'Pedir outro link', conta }) : null,
+      conta.loginDisponivel ? formLink(nome, { variante: 'grande', rotulo: 'Pedir outro link', conta, alvo: pagina }) : null,
       h('div', { class: 'v-rodape-tela' }, h('p', {}, 'O que você guardou continua no cofre. Nada se perde quando um link vence.')))
     pagina.querySelector('input')?.focus()
   }
@@ -505,7 +509,7 @@ export async function paginaEntrar(nome) {
     if (r.status === 410) return vencido()
     botao.disabled = false; msg.className = 'v-status erro'; msg.textContent = 'Não foi possível entrar agora. Tente de novo.'
   } }, 'Entrar')
-  pagina.append(
+  anexar(pagina,
     h('p', { class: 'v-sobre' }, 'Seu acesso'),
     h('h1', {}, 'Quase lá.'),
     h('p', { class: 'v-lead' }, 'Toque em Entrar para abrir suas provas neste aparelho.'),
@@ -531,18 +535,18 @@ export async function paginaMinhasProvas(nome, { vinculada = false } = {}) {
   const provas = r.ok ? r.j.provas : []
   const n = provas.length
   const trazer = nome ? blocoRecolhido('Guardou antes, sem entrar?', 'Trazer para cá com o código de recuperação', () => formTrazer(nome, (o) => paginaMinhasProvas(nome, o))) : null
-  pagina.append(
+  anexar(pagina,
     h('h1', {}, 'Minhas provas'),
     h('p', { class: 'v-nota mono' }, n ? `${n} ${n > 1 ? 'provas' : 'prova'} · conectado neste aparelho` : 'conectado neste aparelho'),
     vinculada ? h('p', { class: 'v-ok', role: 'status' }, 'Pronto. A prova agora está na sua conta.') : null)
   if (n) {
-    pagina.append(
+    anexar(pagina,
       linkBotao(casa, 'Guardar nova prova'),
       h('ul', { class: 'v-lista v-provas' }, provas.map((p) => itemProva(nome, p, null))),
       h('p', { class: 'v-nota' }, 'O pacote de cada prova se confere sem depender de nós.'),
       trazer)
   } else {
-    pagina.append(
+    anexar(pagina,
       h('div', { class: 'v-vazio' }, h('p', { class: 'v-vazio-titulo' }, 'Nada guardado ainda.'), h('p', {}, 'Guarde o print agora. Ele aparece aqui, com o carimbo, assim que chegar ao cofre.')),
       linkBotao(casa, 'Guardar a primeira prova'),
       trazer)

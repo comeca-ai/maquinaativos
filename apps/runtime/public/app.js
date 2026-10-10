@@ -134,8 +134,8 @@ function studio() {
   document.title = 'Studio'
   app.classList.add('studio')
   if (!tokenGuardado()) return entrarNoStudio()
-  const corpo = h('div'); let aba = 'sinais'
-  const nomes = { sinais: 'Sinais do funil', produtos: 'Produtos', vencidos: 'Casos vencidos', interessados: 'Interessados' }
+  const corpo = h('div'); let aba = 'esteira'
+  const nomes = { esteira: 'Esteira', metricas: 'Métricas', pedidos: 'Pedidos', sinais: 'Sinais do funil', produtos: 'Produtos', vencidos: 'Casos vencidos', interessados: 'Interessados' }
   const abas = h('div', { class: 'abas', role: 'group', 'aria-label': 'Seções' })
   const desenhar = async () => {
     abas.replaceChildren(...Object.entries(nomes).map(([k, v]) => h('button', { class: 'sec', 'aria-pressed': String(k === aba), onclick: () => { aba = k; desenhar() } }, v)),
@@ -165,6 +165,9 @@ function tabela(colunas, linhas, numericas = []) {
 }
 
 async function secao(aba) {
+  if (aba === 'esteira') return esteiraView()
+  if (aba === 'metricas') return metricasView()
+  if (aba === 'pedidos') return pedidosView()
   if (aba === 'sinais') {
     const [s, p] = await Promise.all([api('/sinais'), api('/p')])
     if (!s.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
@@ -180,6 +183,7 @@ async function secao(aba) {
     return h('div', {}, p.j.map((x) => h('section', { class: 'cartao' },
       h('h2', { class: 'sem-topo' }, `${x.nome} · ${x.versao}`, x.publico ? ' · público' : ' · interno'),
       h('p', {}, h('strong', {}, 'Critério de morte: '), `${x.criterioDeMorte.minimo} × ${x.criterioDeMorte.metrica} em ${x.criterioDeMorte.prazoDias} dias`),
+      h('p', {}, h('strong', {}, 'Preço: '), descreverPreco(x.preco)),
       h('p', {}, h('strong', {}, 'Estados: '), Object.entries(x.estados).map(([e, d]) => d.final ? `${e} (final)` : `${e} (prazo ${d.prazoDias}d)`).join(' · ')),
       h('p', {}, h('strong', {}, 'Não faremos: '), x.naoFaremos.join(' '))))) 
   }
@@ -189,6 +193,93 @@ async function secao(aba) {
   }
   const i = await api('/interesses'); if (!i.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
   return tabela([['em', 'quando'], ['produto', 'produto'], ['motivo', 'motivo'], ['contato', 'contato']], i.j.interesses)
+}
+
+/* ---------- Studio: preço, esteira, pedidos, métricas ---------- */
+const reais = (c) => (c == null ? '-' : (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
+const mudar = (rota, metodo, corpo) => get('/api' + rota, { method: metodo, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + tokenGuardado() }, body: corpo ? JSON.stringify(corpo) : undefined })
+
+function descreverPreco(p) {
+  if (!p) return 'não declarado (a plataforma não abre pedido)'
+  const base = { interno: 'uso interno', gratis: 'grátis', por_caso: `${reais(p.centavos)} por caso`, assinatura: `${reais(p.centavos)} por mês`, fracao: `${p.fracaoPct}% do valor recuperado` }[p.modelo]
+  return `${base}. Grátis: ${p.gratis}${p.pago ? ' · Pago: ' + p.pago : ''} · custo estimado ${reais(p.custoPorCasoCentavos)}/caso`
+}
+
+const COLUNAS = [['rascunho', 'Rascunho'], ['em_teste', 'Em teste (14 dias)'], ['reaberta', 'Reaberta'], ['viva', 'Viva'], ['morta', 'Morta']]
+const ROTULO_MOTIVO = { sem_pagador: 'ninguém pagaria', dor_sem_evidencia: 'dor sem evidência', planilha_negativa: 'planilha negativa', sacada_copiavel: 'copiável em 1 semana', prazo_sem_sinal: 'prazo sem sinal', criterio_atingido: 'critério atingido', em_andamento: 'em andamento', nova_evidencia: 'nova evidência', reabertura_negada: 'reabertura negada' }
+
+async function esteiraView() {
+  const raiz = h('div')
+  const recarregar = async () => { raiz.replaceChildren(await esteiraConteudo(recarregar)) }
+  await recarregar()
+  return raiz
+}
+
+async function esteiraConteudo(recarregar) {
+  const r = await api('/ideias'); if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
+  const titulo = h('input', { type: 'text', id: 'ti', maxlength: 120, placeholder: 'Ex.: multa de trânsito com vício formal' })
+  const dor = h('input', { type: 'text', id: 'do', maxlength: 1000, placeholder: 'Qual dor, de quem, com que evidência?' })
+  const msg = h('p', { class: 'erro', role: 'alert' })
+  const nova = h('form', { class: 'cartao', onsubmit: async (e) => {
+    e.preventDefault(); msg.textContent = ''
+    const x = await mudar('/ideias', 'POST', { titulo: titulo.value, dor: dor.value })
+    if (!x.ok) { msg.textContent = 'Preencha o título (3+) e a dor (10+ caracteres).'; return }
+    recarregar()
+  } }, h('h2', { class: 'sem-topo' }, 'Nova dor'), h('label', { for: 'ti' }, 'Título'), titulo, h('label', { for: 'do' }, 'Dor e evidência'), dor, h('button', { type: 'submit' }, 'Abrir ficha'), msg)
+  const colunas = COLUNAS.map(([k, nome]) => {
+    const itens = r.j.ideias.filter((i) => (i.estado || 'rascunho') === k)
+    return h('section', { class: 'coluna' }, h('h2', { class: 'sem-topo' }, `${nome} · ${itens.length}`), itens.length ? itens.map((i) => cartaoIdeia(i, r.j.hoje, recarregar)) : h('p', { class: 'vazio' }, 'vazio'))
+  })
+  return h('div', {}, nova, h('div', { class: 'kanban' }, colunas))
+}
+
+function cartaoIdeia(i, hoje, recarregar) {
+  const n = (id, v, rot) => { const el = h('input', { type: 'number', min: 0, value: v, id: id + i.id }); return [h('label', { for: id + i.id }, rot), el] }
+  const [lc, ic] = n('c', i.conversas_reais, 'Conversas reais (meta 10)')
+  const [lp, ip] = n('p', i.disposicao_a_pagar, 'Disposição a pagar')
+  const [lm, im] = n('m', (i.margem_por_caso_centavos / 100).toFixed(2), 'Margem por caso (R$)'); im.step = '0.01'; im.min = ''
+  const ev = h('input', { type: 'checkbox', id: 'e' + i.id }); ev.checked = !!i.evidencia_dor
+  const sc = h('input', { type: 'checkbox', id: 's' + i.id }); sc.checked = !!i.sacada_copiavel
+  const msg = h('p', { role: 'status' })
+  const salvar = async () => mudar('/ideias/' + i.id, 'PATCH', { conversasReais: Number(ic.value), disposicaoAPagar: Number(ip.value), margemPorCasoCentavos: Math.round(Number(im.value) * 100), evidenciaDor: ev.checked, sacadaCopiavel: sc.checked })
+  const prazo = i.prazo_ate ? h('p', { class: 'ajuda' }, `Prazo: ${i.prazo_ate}${i.prazo_ate < hoje ? ' (vencido)' : ''}`) : null
+  const decisao = i.motivo ? h('p', {}, h('strong', {}, 'Regra: '), ROTULO_MOTIVO[i.motivo] || i.motivo) : null
+  const acoes = i.final ? null : h('button', { onclick: async (e) => {
+    e.target.disabled = true; msg.textContent = ''
+    const a = await salvar(); if (!a.ok) { msg.className = 'erro'; msg.textContent = 'Não foi possível salvar.'; e.target.disabled = false; return }
+    const b = await mudar(`/ideias/${i.id}/avaliar`, 'POST')
+    if (!b.ok) { msg.className = 'erro'; msg.textContent = 'Não foi possível avaliar.'; e.target.disabled = false; return }
+    msg.textContent = 'Avaliando…'; setTimeout(recarregar, 2500)
+  } }, 'Salvar e avaliar pela regra')
+  return h('article', { class: 'cartao ideia' }, h('h3', { class: 'sem-topo' }, i.titulo), h('p', {}, i.dor), decisao, prazo,
+    i.final ? h('p', { class: 'ajuda' }, 'Estado final: reabrir só com evidência nova.') : [lc, ic, lp, ip, lm, im,
+      h('label', { class: 'consent', for: 'e' + i.id }, ev, 'Há evidência da dor'), h('label', { class: 'consent', for: 's' + i.id }, sc, 'Copiável em 1 semana sem a sacada')],
+    acoes, msg)
+}
+
+async function metricasView() {
+  const r = await api('/metricas'); if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
+  const m = r.j
+  const kpi = (v, t) => h('div', { class: 'kpi' }, h('strong', {}, v), h('span', {}, t))
+  const total = m.ideiasPorEstado.reduce((a, x) => a + x.total, 0)
+  const vivas = m.ideiasPorEstado.find((x) => x.estado === 'viva')?.total ?? 0
+  return h('div', {}, h('div', { class: 'kpis' }, kpi(String(total), 'ideias'), kpi(String(vivas), 'vivas'), kpi(m.diasIdeiaAteViva == null ? '-' : m.diasIdeiaAteViva + ' d', 'ideia → viva')),
+    h('h2', {}, 'Por produto'),
+    tabela([['produto', 'produto'], ['casos', 'casos'], ['receita', 'receita'], ['custo', 'custo'], ['margem', 'margem'], ['custoCaso', 'custo/caso']],
+      m.porProduto.map((x) => ({ produto: x.produto, casos: x.casos, receita: reais(x.receitaCentavos), custo: reais(x.custoCentavos), margem: reais(x.margemCentavos), custoCaso: reais(x.custoPorCasoCentavos) })), ['casos', 'receita', 'custo', 'margem', 'custoCaso']),
+    h('p', { class: 'ajuda' }, 'Receita = pedidos marcados como pagos. Custo = lançamentos em /api/custos. Sem lançamento, o custo aparece zerado: não é prova de custo zero.'))
+}
+
+async function pedidosView() {
+  const r = await api('/pedidos'); if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
+  const raiz = h('div')
+  const act = (id, rota) => async () => { await mudar(`/pedidos/${id}/${rota}`, 'POST'); raiz.replaceChildren(await pedidosView()) }
+  if (!r.j.pedidos.length) return h('p', { class: 'vazio' }, 'Nenhum pedido ainda. Pagamento nesta etapa é manual: combine o Pix e marque aqui.')
+  raiz.append(h('div', { class: 'rolagem' }, h('table', { class: 'tabela' },
+    h('thead', {}, h('tr', {}, ['quando', 'produto', 'valor', 'contato', 'status', ''].map((t) => h('th', {}, t)))),
+    h('tbody', {}, r.j.pedidos.map((p) => h('tr', {}, h('td', {}, p.criado_em.slice(0, 10)), h('td', {}, p.produto), h('td', { class: 'num' }, reais(p.valor_centavos)), h('td', {}, p.contato), h('td', {}, p.status),
+      h('td', {}, p.status === 'pendente' ? [h('button', { class: 'sec', onclick: act(p.id, 'pago') }, 'Marcar pago'), ' ', h('button', { class: 'sec', onclick: act(p.id, 'cancelar') }, 'Cancelar')] : '')))))))
+  return raiz
 }
 
 rotear()

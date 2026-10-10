@@ -81,6 +81,7 @@ export function regra(c: EntradaProva, ctx: Contexto): Veredito<EstadoProva, Mot
   // 5) Âncora.
   if (c.ancora === 'confirmada') return { estado: 'preservada', motivo: 'ancora_confirmada' }
   if (c.ancora === 'enviada') {
+    // O schema garante ancoraEnviadaEm quando ancora != nao_enviada; o fallback só estreita o tipo.
     const desde = c.ancoraEnviadaEm ?? c.gravadoEm
     return ctx.hoje > somarDias(desde, PRAZO_ANCORA_DIAS)
       ? { estado: 'preservada_sem_ancora', motivo: 'ancora_nao_confirmada_no_prazo' }

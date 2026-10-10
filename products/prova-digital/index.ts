@@ -23,8 +23,16 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
       ancoraEnviadaEm: data.nullable(),
     })
     .superRefine((v, ctx) => {
-      if (v.gravadoNoCofre && v.gravadoEm === null) ctx.addIssue({ code: 'custom', path: ['gravadoEm'], message: 'gravadoEm é obrigatório quando gravadoNoCofre = true' })
-      if (v.ancora !== 'nao_enviada' && v.ancoraEnviadaEm === null) ctx.addIssue({ code: 'custom', path: ['ancoraEnviadaEm'], message: 'ancoraEnviadaEm é obrigatório quando a âncora foi enviada' })
+      const erro = (path: string, message: string) => ctx.addIssue({ code: 'custom', path: [path], message })
+      if (v.arquivoSha256 === null && (v.gravadoNoCofre || v.manifestoGravado)) erro('arquivoSha256', 'sem arquivo recebido não pode haver gravação no cofre')
+      if (v.gravadoNoCofre !== (v.gravadoEm !== null)) erro('gravadoEm', 'gravadoEm deve existir se, e somente se, gravadoNoCofre = true')
+      if (v.gravadoEm !== null && v.gravadoEm < v.solicitadoEm) erro('gravadoEm', 'gravadoEm não pode ser anterior a solicitadoEm')
+      if (v.ancora === 'nao_enviada' && v.ancoraEnviadaEm !== null) erro('ancoraEnviadaEm', 'sem âncora enviada não há data de envio')
+      if (v.ancora !== 'nao_enviada') {
+        if (v.ancoraEnviadaEm === null) erro('ancoraEnviadaEm', 'ancoraEnviadaEm é obrigatório quando a âncora foi enviada')
+        if (!v.gravadoNoCofre || !v.manifestoGravado) erro('ancora', 'não se ancora o que ainda não está gravado no cofre com manifesto')
+        if (v.ancoraEnviadaEm !== null && v.gravadoEm !== null && v.ancoraEnviadaEm < v.gravadoEm) erro('ancoraEnviadaEm', 'âncora não pode ser enviada antes da gravação')
+      }
     }),
   estados: {
     aguardando_captura: { final: false, prazoDias: PRAZO_CAPTURA_DIAS },
@@ -60,6 +68,8 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
     'Nenhuma IA toca no arquivo capturado nem decide o estado.',
     'Não captura sem consentimento, nem conteúdo íntimo ou de menores.',
     'Não guarda IP nem user-agent sem consentimento explícito.',
+    'Não apaga nem sobrescreve provas: o Worker de escrita não tem caminho de delete; leitura de arquivo vai para log append-only.',
+    'Não captura URL no servidor na v1 (Browser Rendering).',
   ],
 })
 

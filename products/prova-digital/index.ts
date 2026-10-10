@@ -68,6 +68,13 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
       nome: 'Tinha Print',
       destaque: 'Print',
       promessa: 'Guarde a prova antes que apaguem.',
+      chamada: 'Guardar uma prova agora',
+      cenas: [
+        { titulo: 'A conversa que o outro apagou', texto: 'Mensagem, áudio ou ameaça que sumiu do aplicativo depois que você mostrou que ia usar.' },
+        { titulo: 'O anúncio que saiu do ar', texto: 'A oferta, o preço ou a promessa que estava na página e depois mudou ou desapareceu.' },
+        { titulo: 'O post que foi editado', texto: 'A publicação ou o comentário que ganhou outra redação quando o problema apareceu.' },
+        { titulo: 'O perfil que mudou de nome', texto: 'A conta que trocou de nome, foto ou sumiu logo depois do ocorrido.' },
+      ],
       passos: [
         { titulo: 'Capture', texto: 'Marque o consentimento e escolha: print da tela, gravação da tela ou um arquivo que você já tem.' },
         { titulo: 'Cofre', texto: 'Calculamos a impressão digital (SHA-256) no seu navegador e o servidor confere. O arquivo vai para um cofre privado, sem link público.' },

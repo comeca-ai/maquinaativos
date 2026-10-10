@@ -1,0 +1,29 @@
+{
+  "name": "maquinaativos",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "registro": "node scripts/gerar-registro.mjs",
+    "registro:check": "node scripts/gerar-registro.mjs --check",
+    "cerca": "node scripts/cerca.mjs",
+    "dev": "wrangler dev -c apps/runtime/wrangler.jsonc",
+    "deploy": "wrangler deploy -c apps/runtime/wrangler.jsonc",
+    "db:local": "wrangler d1 migrations apply maquina --local -c apps/runtime/wrangler.jsonc",
+    "db:remoto": "wrangler d1 migrations apply maquina --remote -c apps/runtime/wrangler.jsonc"
+  },
+  "dependencies": {
+    "hono": "^4.13.13",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261010.1",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0"
+  }
+}

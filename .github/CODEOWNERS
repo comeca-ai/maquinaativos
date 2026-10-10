@@ -1,0 +1,7 @@
+# Toda regra de produto exige aprovação do dono (Portão 2).
+# TROQUE @comeca-ai/dono pelo seu usuário ou time do GitHub.
+/products/*/rule.ts   @comeca-ai/dono
+/packages/core/       @comeca-ai/dono
+/apps/runtime/        @comeca-ai/dono
+/scripts/cerca.mjs    @comeca-ai/dono
+/.github/             @comeca-ai/dono

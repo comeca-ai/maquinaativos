@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "maquinaativos",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "maquina",
+      // Depois de `wrangler d1 create maquina`, cole aqui o database_id que ele devolver.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "workflows": [
+    { "name": "maquina-caso", "binding": "CASO_WF", "class_name": "CasoWorkflow" }
+  ]
+  // Segredo de escrita: `wrangler secret put API_TOKEN` (local: apps/runtime/.dev.vars).
+}

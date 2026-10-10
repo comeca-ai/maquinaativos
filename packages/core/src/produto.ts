@@ -1,4 +1,6 @@
 import type { ZodType } from 'zod'
+import type { Tela } from './tela'
+import { validarTela } from './tela'
 
 /** Estado final não tem prazo. Estado não-final OBRIGATORIAMENTE tem prazo (nada de "em análise" eterno). */
 export type DefEstado = { final: true } | { final: false; prazoDias: number }
@@ -38,6 +40,8 @@ export interface Produto<E extends string = string, M extends string = string, I
   /** Efeitos colaterais por estado. Nunca fazem parte da prova da regra. */
   efeitos?: Partial<Record<E, Efeito[]>>
   criterioDeMorte: CriterioDeMorte
+  /** Tela pública declarada como DADOS. O framework renderiza; o produto não escreve HTML. Sem tela = produto interno. */
+  tela?: Tela<M>
   /** Arquivo "o que não faremos" é obrigatório por produto (ver products/<x>/NAO-FAREMOS.md). */
   naoFaremos: readonly string[]
 }
@@ -69,6 +73,7 @@ export function validarProduto(p: Produto): string[] {
   }
   if (!(p.criterioDeMorte.prazoDias > 0)) erros.push('criterioDeMorte.prazoDias deve ser > 0')
   if (!p.criterioDeMorte.metrica) erros.push('criterioDeMorte.metrica é obrigatória')
+  if (p.tela) erros.push(...validarTela(p.tela, Object.keys(p.motivos)))
   if (p.naoFaremos.length === 0) erros.push('naoFaremos não pode ser vazio: diga o que este produto NÃO faz')
   return erros
 }

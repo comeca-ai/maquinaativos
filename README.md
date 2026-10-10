@@ -19,7 +19,7 @@ pnpm install
 pnpm test                  # contrato, ontologia BR, cobertura de cada produto
 echo 'API_TOKEN=teste-local' > apps/runtime/.dev.vars
 pnpm db:local
-pnpm dev                   # http://localhost:8787
+pnpm dev                   # http://localhost:8787  (/ = público, /studio = interno)
 ```
 
 ## Subir no Wrangler

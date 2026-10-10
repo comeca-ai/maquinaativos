@@ -67,3 +67,33 @@ describe('ontologia brasileira', () => {
   })
   it('datas', () => { expect(somarDias('2026-02-27', 3)).toBe('2026-03-02'); expect(diasEntre('2026-03-01', '2026-03-15')).toBe(14) })
 })
+
+import { validarTela, montarEntrada, type Tela } from '@maquina/core'
+
+describe('tela declarativa', () => {
+  const tela: Tela = {
+    titulo: 'T', subtitulo: 'S', aviso: 'A',
+    campos: [
+      { nome: 'quando', rotulo: 'Quando', tipo: 'data' },
+      { nome: 'depois', rotulo: 'Depois', tipo: 'data', opcional: true },
+      { nome: 'flagrante', rotulo: 'No ato?', tipo: 'sim_nao' },
+    ],
+    fixos: { extras: [] },
+    resultados: { a: { titulo: 'x', explicacao: 'y', tom: 'ok' }, b: { titulo: 'x', explicacao: 'y', tom: 'ok' } },
+    oferecerAjudaEm: ['a'],
+    textoAjuda: 'ajuda',
+  }
+  it('exige texto para toda motivo', () => {
+    expect(validarTela(tela, ['a', 'b'])).toEqual([])
+    expect(validarTela(tela, ['a', 'b', 'c']).join()).toContain('motivo "c" não tem texto')
+  })
+  it('recusa oferecerAjudaEm inexistente', () => {
+    expect(validarTela({ ...tela, oferecerAjudaEm: ['zzz'] }, ['a', 'b']).join()).toContain('inexistente')
+  })
+  it('monta a entrada: data opcional vazia vira null, sim_nao vira boolean, fixos entram', () => {
+    expect(montarEntrada(tela, { quando: '2026-01-01', depois: '', flagrante: 'sim' })).toEqual({
+      extras: [], quando: '2026-01-01', depois: null, flagrante: true,
+    })
+    expect(montarEntrada(tela, { quando: '', flagrante: false }).quando).toBeUndefined()
+  })
+})

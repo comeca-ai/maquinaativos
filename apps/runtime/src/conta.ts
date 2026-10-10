@@ -18,6 +18,10 @@ import type { Env } from './env'
  */
 export const conta = new Hono<{ Bindings: Env }>()
 
+/** Só oferece o login quando tudo existe E o dono ligou (LOGIN_EMAIL=ligado), depois de verificar o domínio no Email Service. */
+const loginLigado = (env: Env): env is Env & { EMAIL: SendEmail; SEGREDO_CONTA: string; EMAIL_REMETENTE: string } =>
+  env.LOGIN_EMAIL === 'ligado' && Boolean(env.EMAIL && env.SEGREDO_CONTA && env.EMAIL_REMETENTE)
+
 const MAX_LINKS_POR_EMAIL_15MIN = 3
 const MAX_LINKS_POR_ORIGEM_HORA = 10
 
@@ -44,7 +48,7 @@ conta.post('/link', async (c) => {
   if (!(await turnstileOk(c.env, corpo?.turnstile, ip))) return c.json({ erro: 'verificacao_falhou' }, 403)
   const email = normalizarEmail(corpo?.email)
   if (!email) return c.json({ erro: 'email_invalido' }, 422)
-  if (!c.env.EMAIL || !c.env.SEGREDO_CONTA || !c.env.EMAIL_REMETENTE) return c.json({ erro: 'login_indisponivel' }, 503)
+  if (!loginLigado(c.env)) return c.json({ erro: 'login_indisponivel' }, 503)
 
   const produto = typeof corpo?.produto === 'string' && produtos[corpo.produto] ? corpo.produto : null
   const eh = await hmacHex(c.env.SEGREDO_CONTA, `email:${email}`)
@@ -109,7 +113,7 @@ conta.post('/entrar', async (c) => {
 conta.get('/eu', async (c) => {
   c.header('cache-control', 'no-store')
   const id = await contaDaSessao(c)
-  return c.json({ logado: Boolean(id), loginDisponivel: Boolean(c.env.EMAIL && c.env.SEGREDO_CONTA && c.env.EMAIL_REMETENTE) })
+  return c.json({ logado: Boolean(id), loginDisponivel: loginLigado(c.env) })
 })
 
 conta.post('/sair', async (c) => {

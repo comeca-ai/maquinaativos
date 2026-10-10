@@ -44,6 +44,7 @@ Valores de preço da Cloudflare: confirmar na documentação oficial antes de de
 
 ## Revisão Cloudflare de 10/10/2026 (jhoneme)
 Feito: TLS mínimo 1.2 e HTTPS obrigatório na zona tinhaprint.com.br; limite de taxa (20 req/10 s por IP em PUT/POST `/pub/*`, só no domínio); cron sem Workflow por hora por prova; nome do arquivo fora da URL (logs); limite de upload 95 MiB (corpo máximo 100 MB na zona Free).
+Para ligar o login: verificar o domínio no Email Service e trocar `LOGIN_EMAIL` para `ligado` em wrangler.jsonc.
 Pendente: zona `pending` (nameservers no Registro.br); domínio no Email Service (os registros atuais SPF `-all`, DMARC `reject` e MX nulo bloqueiam e-mail); Cloudflare Access em `/studio` e `/api`; desligar workers.dev depois do domínio ativo; decidir Bucket Lock no R2 (custódia x LGPD).
 Atenção: o deploy pelo Git (merge na `main`) não aplica migrações. Aplique `pnpm db:remoto` ANTES do merge que depende de migração nova.
 Segredos do Worker: `API_TOKEN`, `SEGREDO_ORIGEM`, `SEGREDO_CONTA` (não rotacione o `SEGREDO_CONTA` sem migração: ele identifica as contas).

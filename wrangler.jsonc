@@ -16,7 +16,7 @@
   },
   // Turnstile (opcional): `wrangler secret put TURNSTILE_SECRET` e defina TURNSTILE_SITEKEY aqui.
   // DOMINIOS: domínio -> produto que responde na raiz (JSON em texto).
-  "vars": { "TURNSTILE_SITEKEY": "", "EMAIL_REMETENTE": "Tinha Print <acesso@tinhaprint.com.br>", "DOMINIOS": "{\"tinhaprint.com.br\":\"prova-digital\",\"www.tinhaprint.com.br\":\"prova-digital\"}" },
+  "vars": { "TURNSTILE_SITEKEY": "", "EMAIL_REMETENTE": "Tinha Print <acesso@tinhaprint.com.br>", "LOGIN_EMAIL": "desligado", "DOMINIOS": "{\"tinhaprint.com.br\":\"prova-digital\",\"www.tinhaprint.com.br\":\"prova-digital\"}" },
   "d1_databases": [
     {
       "binding": "DB",

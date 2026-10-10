@@ -1,8 +1,9 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { executar, jsonEstavel, sha256 as sha256Texto, type FatosCaptura, type Produto } from '@maquina/core'
 import { ancorar, atualizar, alturasBitcoin, zipStore, AGREGADORES_PADRAO } from '@maquina/kits'
 import { produtos } from './registro.gerado'
 import { hojeBR, turnstileOk } from './publico'
+import { contaDaSessao } from './sessao'
 import type { Env } from './env'
 
 /**
@@ -23,7 +24,7 @@ function produtoDeCaptura(nome: string): Produto | null {
   return p?.captura ? p : null
 }
 
-async function origemHash(env: Env, ip: string | undefined): Promise<string> {
+export async function origemHash(env: Env, ip: string | undefined): Promise<string> {
   const chave = env.SEGREDO_ORIGEM || env.API_TOKEN || 'dev'
   const k = await crypto.subtle.importKey('raw', enc.encode(chave), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return hexDe(await crypto.subtle.sign('HMAC', k, enc.encode(ip ?? 'sem-ip')))
@@ -43,7 +44,7 @@ export interface LinhaProva {
   id: string; produto: string; caso_id: string; chave_hash: string; origem: string; nome_arquivo: string; mime: string; bytes: number
   sha256: string; manifesto_sha256: string; solicitado_em: string; gravado_em: string; gravado_em_dia: string; origem_hash: string
   volume_na_captura: number; ancora: 'nao_enviada' | 'enviada' | 'confirmada'; ancora_enviada_em: string | null
-  ancora_calendarios: number; chave_ots: string | null; chave_ots_confirmada: string | null; ots_altura: number | null; vedado: number
+  ancora_calendarios: number; chave_ots: string | null; chave_ots_confirmada: string | null; ots_altura: number | null; vedado: number; conta_id?: string | null
 }
 
 export function fatosDaProva(r: LinhaProva): FatosCaptura {
@@ -136,6 +137,7 @@ capturaPublica.put('/:produto/captura', async (c) => {
     return c.json({ recusada: true, estado: caso.veredito.estado, motivo: caso.veredito.motivo }, 403)
   }
 
+  const contaId = await contaDaSessao(c) // enviada logado: a prova já nasce na conta
   const id = crypto.randomUUID()
   const chaveR2 = `provas/${id}/arquivo`
   let obj: R2Object | null = null
@@ -164,36 +166,45 @@ capturaPublica.put('/:produto/captura', async (c) => {
   const linha: LinhaProva = {
     id, produto: p.nome, caso_id: '', chave_hash: await sha256Texto(chaveUsuario), origem, nome_arquivo: nome, mime, bytes: obj.size, sha256: sha,
     manifesto_sha256: manifestoSha, solicitado_em: hoje, gravado_em: agora.toISOString(), gravado_em_dia: diaBR(agora), origem_hash: oh,
-    volume_na_captura: anteriores + 1, ancora: 'nao_enviada', ancora_enviada_em: null, ancora_calendarios: 0, chave_ots: null, chave_ots_confirmada: null, ots_altura: null, vedado: 0,
+    volume_na_captura: anteriores + 1, ancora: 'nao_enviada', ancora_enviada_em: null, ancora_calendarios: 0, chave_ots: null, chave_ots_confirmada: null, ots_altura: null, vedado: 0, conta_id: contaId,
   }
   Object.assign(linha, await tentarAncorar(c.env, linha))
 
   const caso = await registrarCaso(c.env, p, null, fatosDaProva(linha))
   linha.caso_id = caso.casoId
   await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO provas (id, produto, caso_id, chave_hash, origem, nome_arquivo, mime, bytes, sha256, manifesto_sha256, solicitado_em, gravado_em, gravado_em_dia, origem_hash, volume_na_captura, ancora, ancora_enviada_em, ancora_calendarios, chave_ots, chave_ots_confirmada, ots_altura, vedado)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+    c.env.DB.prepare(`INSERT INTO provas (id, produto, caso_id, chave_hash, origem, nome_arquivo, mime, bytes, sha256, manifesto_sha256, solicitado_em, gravado_em, gravado_em_dia, origem_hash, volume_na_captura, ancora, ancora_enviada_em, ancora_calendarios, chave_ots, chave_ots_confirmada, ots_altura, vedado, conta_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
       linha.id, linha.produto, linha.caso_id, linha.chave_hash, linha.origem, linha.nome_arquivo, linha.mime, linha.bytes, linha.sha256, linha.manifesto_sha256,
       linha.solicitado_em, linha.gravado_em, linha.gravado_em_dia, linha.origem_hash, linha.volume_na_captura, linha.ancora, linha.ancora_enviada_em,
-      linha.ancora_calendarios, linha.chave_ots, linha.chave_ots_confirmada, linha.ots_altura, linha.vedado),
+      linha.ancora_calendarios, linha.chave_ots, linha.chave_ots_confirmada, linha.ots_altura, linha.vedado, linha.conta_id ?? null),
     c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'captura', ?, ?)").bind(id, oh, linha.gravado_em),
   ])
   return c.json({
     id, codigoDeRecuperacao: chaveUsuario, sha256: sha, manifestoSha256: manifestoSha, bytes: obj.size, recebidoEm: linha.gravado_em,
-    ancora: linha.ancora, estado: caso.veredito.estado, motivo: caso.veredito.motivo,
+    ancora: linha.ancora, estado: caso.veredito.estado, motivo: caso.veredito.motivo, naConta: Boolean(contaId),
   }, 201)
 })
 
-async function carregar(env: Env, produto: string, id: string, chave: unknown): Promise<LinhaProva | null> {
+export async function carregar(env: Env, produto: string, id: string, chave: unknown): Promise<LinhaProva | null> {
   if (typeof chave !== 'string' || chave.length < 16 || chave.length > 128) return null
   const r = await env.DB.prepare('SELECT * FROM provas WHERE id = ? AND produto = ?').bind(id, produto).first<LinhaProva>()
   if (!r) return null
   return iguaisConstante(r.chave_hash, await sha256Texto(chave)) ? r : null
 }
 
+/** Acesso pela chave (código de recuperação) OU pela sessão da conta dona da prova. */
+async function carregarComAcesso(c: Context<{ Bindings: Env }>, chave: unknown): Promise<LinhaProva | null> {
+  const produto = c.req.param('produto')!, id = c.req.param('id')!
+  if (chave) return carregar(c.env, produto, id, chave)
+  const contaId = await contaDaSessao(c)
+  if (!contaId) return null
+  return c.env.DB.prepare('SELECT * FROM provas WHERE id = ? AND produto = ? AND conta_id = ?').bind(id, produto, contaId).first<LinhaProva>()
+}
+
 capturaPublica.post('/:produto/provas/:id/estado', async (c) => {
   const corpo = (await c.req.json().catch(() => null)) as { chave?: string } | null
-  const r = await carregar(c.env, c.req.param('produto'), c.req.param('id'), corpo?.chave)
+  const r = await carregarComAcesso(c, corpo?.chave)
   if (!r) return c.json({ erro: 'nao_encontrada' }, 404) // mesma resposta para id inexistente e chave errada
   const caso = await c.env.DB.prepare('SELECT estado, motivo, final, prazo_ate FROM casos WHERE id = ?').bind(r.caso_id).first()
   return c.json({ id: r.id, nome: r.nome_arquivo, bytes: r.bytes, sha256: r.sha256, manifestoSha256: r.manifesto_sha256, recebidoEm: r.gravado_em, ancora: r.ancora, otsAltura: r.ots_altura, vedado: r.vedado === 1, caso })
@@ -219,7 +230,7 @@ O que NÃO prova: que o conteúdo é verdadeiro, nem que será aceito como prova
 
 capturaPublica.post('/:produto/provas/:id/pacote', async (c) => {
   const corpo = (await c.req.json().catch(() => null)) as { chave?: string } | null
-  const r = await carregar(c.env, c.req.param('produto'), c.req.param('id'), corpo?.chave)
+  const r = await carregarComAcesso(c, corpo?.chave)
   if (!r) return c.json({ erro: 'nao_encontrada' }, 404)
   if (r.vedado) return c.json({ erro: 'indisponivel' }, 451)
   const [arq, man] = await Promise.all([c.env.PROVAS.get(`provas/${r.id}/arquivo`), c.env.PROVAS.get(`provas/${r.id}/manifesto.json`)])

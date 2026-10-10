@@ -4,6 +4,7 @@ import { produtos } from './registro.gerado'
 import { publico, hojeBR } from './publico'
 import { esteira } from './esteira'
 import { capturaPublica, capturaInterna, manutencaoCaptura } from './captura'
+import { conta, limparContas } from './conta'
 import type { Env } from './env'
 
 export { CasoWorkflow } from './workflow'
@@ -13,6 +14,7 @@ const app = new Hono<{ Bindings: Env }>()
 app.get('/saude', (c) => c.json({ ok: true, produtos: Object.keys(produtos) }))
 
 // Público: a experiência de cada produto, renderizada pelo framework a partir da `tela` declarada.
+app.route('/pub/conta', conta)
 app.route('/pub', publico)
 app.route('/pub', capturaPublica)
 
@@ -117,5 +119,6 @@ export default {
   // Cron: ancora o que faltou, promove a Bitcoin o que já confirmou e reavalia casos abertos.
   async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(manutencaoCaptura(env).then((r) => console.log('manutencao-captura', JSON.stringify(r))))
+    ctx.waitUntil(limparContas(env))
   },
 } satisfies ExportedHandler<Env>

@@ -28,15 +28,27 @@ const MAX_LINKS_POR_ORIGEM_HORA = 10
 
 const escapar = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!)
 
-export function mensagemDoLink(nome: string, link: string, minutos: number) {
+/** E-mail do link mágico. Layout em tabela e estilos inline (é o que os clientes de e-mail respeitam). */
+export function mensagemDoLink(nome: string, link: string, minutos: number, destaque?: string) {
   const assunto = `Seu acesso ao ${nome}`
-  const texto = `Para entrar no ${nome}, abra este link e toque em "Entrar":\n\n${link}\n\nEle vale ${minutos} minutos e funciona uma vez só.\nSe não foi você que pediu, ignore este e-mail. Ninguém entra sem clicar no link.\n`
-  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f4f1ea;color:#141414;font-family:Arial,Helvetica,sans-serif">
-<p style="font-size:18px;margin:0 0 16px"><strong>${escapar(nome)}</strong></p>
-<p style="font-size:16px;line-height:1.5;margin:0 0 20px">Para entrar, toque no botão abaixo e depois em <strong>Entrar</strong>.</p>
-<p style="margin:0 0 24px"><a href="${escapar(link)}" style="display:inline-block;background:#141414;color:#f4f1ea;padding:14px 22px;text-decoration:none;font-weight:bold;border-radius:2px">Abrir meu acesso</a></p>
-<p style="font-size:14px;line-height:1.5;color:#555;margin:0 0 8px">O link vale ${minutos} minutos e funciona uma vez só.</p>
-<p style="font-size:14px;line-height:1.5;color:#555;margin:0">Se não foi você que pediu, ignore este e-mail.</p>
+  const texto = `Toque no link para entrar no ${nome}:\n\n${link}\n\nEle abre a página do ${nome}. Lá, toque em "Entrar" e pronto.\nO link vale ${minutos} minutos e funciona uma vez só.\nNão foi você que pediu? Ignore este e-mail. Ninguém entra sem tocar no link.\n\n${nome} · esta caixa não recebe respostas.\n`
+  const marca = destaque && nome.endsWith(destaque)
+    ? `${escapar(nome.slice(0, nome.length - destaque.length))}<span style="color:#C52D23">${escapar(destaque)}</span>`
+    : escapar(nome)
+  const l = escapar(link)
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="color-scheme" content="light"><title>${escapar(assunto)}</title></head>
+<body style="margin:0;padding:0;background:#E4DFD5">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#E4DFD5"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#F6F3ED;border:1px solid #CCC6BD"><tr><td style="padding:32px 32px 28px;font-family:Arial,Helvetica,sans-serif;color:#161311">
+<p style="margin:0 0 22px;font-family:Impact,'Arial Narrow',Arial,sans-serif;font-size:24px;line-height:1;letter-spacing:0.5px;text-transform:uppercase">${marca}</p>
+<h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;font-weight:bold">Toque no botão para entrar.</h1>
+<p style="margin:0 0 24px;font-size:16px;line-height:1.55">Ele abre a página do ${escapar(nome)}. Lá, toque em <strong>Entrar</strong> e pronto: o que você guardou aparece em Minhas provas.</p>
+<a href="${l}" style="display:inline-block;background:#161311;color:#F6F3ED;padding:15px 26px;font-size:16px;font-weight:bold;text-decoration:none;border-radius:2px">Abrir meu acesso</a>
+<p style="margin:26px 0 0;padding-top:16px;border-top:1px solid #CCC6BD;font-size:14px;line-height:1.5;color:#554E49">O link vale <strong style="color:#161311">${minutos} minutos</strong> e funciona <strong style="color:#161311">uma vez só</strong>.<br>Não foi você que pediu? Ignore este e-mail. Ninguém entra sem tocar no botão.</p>
+<p style="margin:18px 0 0;font-size:12px;line-height:1.5;color:#554E49">${escapar(nome)} · esta caixa não recebe respostas.</p>
+</td></tr></table>
+<p style="margin:16px 0 0;max-width:520px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#554E49">Se o botão não funcionar, copie este endereço no navegador:<br><span style="word-break:break-all">${l}</span></p>
+</td></tr></table>
 </body></html>`
   return { assunto, texto, html }
 }
@@ -73,8 +85,8 @@ conta.post('/link', async (c) => {
   await c.env.DB.prepare('INSERT INTO links_login (token_hash, email_hash, origem_hash, produto, vincular_prova, criado_em, expira_em) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .bind(await sha256Texto(token), eh, oh, produto, vincular, agora.toISOString(), new Date(agora.getTime() + LINK_MINUTOS * 60_000).toISOString()).run()
 
-  const nome = (produto && produtos[produto]?.captura?.marca?.nome) || 'sua conta'
-  const m = mensagemDoLink(nome, `${new URL(c.req.url).origin}/entrar${produto ? `?p=${encodeURIComponent(produto)}` : ''}#t=${token}`, LINK_MINUTOS)
+  const marca = produto ? produtos[produto]?.captura?.marca : undefined
+  const m = mensagemDoLink(marca?.nome || 'sua conta', `${new URL(c.req.url).origin}/entrar${produto ? `?p=${encodeURIComponent(produto)}` : ''}#t=${token}`, LINK_MINUTOS, marca?.destaque)
   try {
     await c.env.EMAIL.send({ from: remetente(c.env.EMAIL_REMETENTE), to: email, subject: m.assunto, text: m.texto, html: m.html })
   } catch (e) {
@@ -116,7 +128,26 @@ conta.post('/entrar', async (c) => {
 conta.get('/eu', async (c) => {
   c.header('cache-control', 'no-store')
   const id = await contaDaSessao(c)
-  return c.json({ logado: Boolean(id), loginDisponivel: loginLigado(c.env) })
+  const ligado = loginLigado(c.env)
+  // remetente: só o endereço, para a dica "procure por ... no spam"; sessaoDias: quanto tempo a pessoa fica conectada.
+  const remetenteEmail = ligado ? (/<([^>]+)>/.exec(c.env.EMAIL_REMETENTE!)?.[1] ?? c.env.EMAIL_REMETENTE) : null
+  return c.json({ logado: Boolean(id), loginDisponivel: ligado, remetente: remetenteEmail, sessaoDias: SESSAO_DIAS, linkMinutos: LINK_MINUTOS })
+})
+
+// POST /pub/conta/vincular { produto, id, chave } — logado, traz para a conta uma prova guardada antes (prova de posse: o código).
+conta.post('/vincular', async (c) => {
+  if (!mesmaOrigem(c)) return c.json({ erro: 'origem_invalida' }, 403)
+  const contaId = await contaDaSessao(c)
+  if (!contaId) return c.json({ erro: 'sem_sessao' }, 401)
+  const corpo = (await c.req.json().catch(() => null)) as { produto?: unknown; id?: unknown; chave?: unknown } | null
+  const produto = typeof corpo?.produto === 'string' && produtos[corpo.produto] ? corpo.produto : null
+  if (!produto) return c.json({ erro: 'produto_invalido' }, 422)
+  const r = await carregar(c.env, produto, String(corpo?.id ?? '').trim(), typeof corpo?.chave === 'string' ? corpo.chave.trim() : corpo?.chave)
+  if (!r) return c.json({ erro: 'prova_nao_encontrada' }, 404) // id inexistente e código errado: mesma resposta
+  if (r.conta_id === contaId) return c.json({ ok: true, jaEstava: true })
+  if (r.conta_id) return c.json({ erro: 'outra_conta' }, 409)
+  const u = await c.env.DB.prepare('UPDATE provas SET conta_id = ? WHERE id = ? AND conta_id IS NULL').bind(contaId, r.id).run()
+  return u.meta.changes ? c.json({ ok: true }) : c.json({ erro: 'outra_conta' }, 409)
 })
 
 conta.post('/sair', async (c) => {

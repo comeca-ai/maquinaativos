@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { cookieSessao, lerCookie, mesmaOrigem, normalizarEmail, remetente, tokenAleatorio, tokenValido, hmacHex } from '../apps/runtime/src/sessao'
+import { mensagemDoLink } from '../apps/runtime/src/conta'
 
 describe('link mágico: utilitários puros', () => {
   it('token tem 256 bits em base64url e é sempre diferente', () => {
@@ -54,5 +55,20 @@ describe('link mágico: utilitários puros', () => {
     expect(mesmaOrigem(ctx({ origin: 'null', 'sec-fetch-site': 'same-origin' }))).toBe(true)
     expect(mesmaOrigem(ctx({ origin: 'null', 'sec-fetch-site': 'cross-site' }))).toBe(false)
     expect(mesmaOrigem(ctx({}))).toBe(false)
+  })
+
+  it('e-mail do link: botão, prazo, uso único, marca com destaque e tudo escapado', () => {
+    const link = 'https://tinhaprint.com.br/entrar?p=prova-digital#t=abc'
+    const m = mensagemDoLink('Tinha Print', link, 15, 'Print')
+    expect(m.assunto).toBe('Seu acesso ao Tinha Print')
+    expect(m.html).toContain('Abrir meu acesso')
+    expect(m.html).toContain(`href="${link}"`)
+    expect(m.html).toContain('Tinha <span style="color:#C52D23">Print</span>')
+    expect(m.html).toContain('15 minutos')
+    expect(m.texto).toContain(link)
+    expect(m.texto).toMatch(/uma vez só/)
+    const x = mensagemDoLink('<b>X</b>', 'https://a.b/?q="><script>', 15)
+    expect(x.html).not.toContain('<b>X</b>')
+    expect(x.html).not.toContain('"><script>')
   })
 })

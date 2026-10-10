@@ -15,7 +15,8 @@
     "run_worker_first": ["/api/*", "/pub/*", "/saude"]
   },
   // Turnstile (opcional): `wrangler secret put TURNSTILE_SECRET` e defina TURNSTILE_SITEKEY aqui.
-  "vars": { "TURNSTILE_SITEKEY": "" },
+  // DOMINIOS: domínio -> produto que responde na raiz (JSON em texto).
+  "vars": { "TURNSTILE_SITEKEY": "", "DOMINIOS": "{\"tinhaprint.com.br\":\"prova-digital\",\"www.tinhaprint.com.br\":\"prova-digital\"}" },
   "d1_databases": [
     {
       "binding": "DB",

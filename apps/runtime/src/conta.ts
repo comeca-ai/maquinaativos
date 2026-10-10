@@ -7,6 +7,7 @@ import {
   COOKIE_SESSAO, LINK_MINUTOS, SESSAO_DIAS, contaDaSessao, cookieSessao, hmacHex, lerCookie, mesmaOrigem, normalizarEmail, remetente,
   tokenAleatorio, tokenValido,
 } from './sessao'
+import { contar } from './vitrine'
 import type { Env } from './env'
 
 /**
@@ -80,6 +81,7 @@ conta.post('/link', async (c) => {
     console.error('email_falhou', (e as { code?: string }).code ?? String(e))
     return c.json({ erro: 'email_falhou' }, 502)
   }
+  c.executionCtx.waitUntil(contar(c.env, produto, 'pediu_link'))
   return c.json({ ok: true, minutos: LINK_MINUTOS })
 })
 
@@ -89,8 +91,8 @@ conta.post('/entrar', async (c) => {
   const corpo = (await c.req.json().catch(() => null)) as { token?: unknown } | null
   if (!tokenValido(corpo?.token)) return c.json({ erro: 'link_invalido' }, 410)
   const agora = new Date().toISOString()
-  const link = await c.env.DB.prepare('UPDATE links_login SET usado_em = ? WHERE token_hash = ? AND usado_em IS NULL AND expira_em > ? RETURNING email_hash, vincular_prova')
-    .bind(agora, await sha256Texto(corpo.token), agora).first<{ email_hash: string; vincular_prova: string | null }>()
+  const link = await c.env.DB.prepare('UPDATE links_login SET usado_em = ? WHERE token_hash = ? AND usado_em IS NULL AND expira_em > ? RETURNING email_hash, vincular_prova, produto')
+    .bind(agora, await sha256Texto(corpo.token), agora).first<{ email_hash: string; vincular_prova: string | null; produto: string | null }>()
   if (!link) return c.json({ erro: 'link_invalido' }, 410) // vencido, usado ou inexistente: mesma resposta
 
   await c.env.DB.prepare('INSERT INTO contas (id, email_hash, criada_em) VALUES (?, ?, ?) ON CONFLICT(email_hash) DO NOTHING').bind(crypto.randomUUID(), link.email_hash, agora).run()
@@ -106,6 +108,7 @@ conta.post('/entrar', async (c) => {
   await c.env.DB.prepare('INSERT INTO sessoes (token_hash, conta_id, criada_em, expira_em) VALUES (?, ?, ?, ?)')
     .bind(await sha256Texto(sessao), contaRow.id, agora, new Date(Date.now() + SESSAO_DIAS * 86400_000).toISOString()).run()
   c.header('set-cookie', cookieSessao(sessao, new URL(c.req.url).protocol === 'https:'))
+  c.executionCtx.waitUntil(contar(c.env, link.produto, 'entrou'))
   c.header('cache-control', 'no-store')
   return c.json({ ok: true, vinculada })
 })

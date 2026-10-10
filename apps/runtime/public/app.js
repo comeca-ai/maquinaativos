@@ -395,7 +395,22 @@ async function metricasView() {
     h('h2', {}, 'Por produto'),
     tabela([['produto', 'produto'], ['casos', 'casos'], ['receita', 'receita'], ['custo', 'custo'], ['margem', 'margem'], ['custoCaso', 'custo/caso']],
       m.porProduto.map((x) => ({ produto: x.produto, casos: x.casos, receita: reais(x.receitaCentavos), custo: reais(x.custoCentavos), margem: reais(x.margemCentavos), custoCaso: reais(x.custoPorCasoCentavos) })), ['casos', 'receita', 'custo', 'margem', 'custoCaso']),
-    h('p', { class: 'ajuda' }, 'Receita = pedidos marcados como pagos. Custo = lançamentos em /api/custos. Sem lançamento, o custo aparece zerado: não é prova de custo zero.'))
+    h('p', { class: 'ajuda' }, 'Receita = pedidos marcados como pagos. Custo = lançamentos em /api/custos. Sem lançamento, o custo aparece zerado: não é prova de custo zero.'),
+    await funilView())
+}
+
+const ROTULO_ETAPA = { visita: 'visitas', consentiu: 'autorizaram', escolheu: 'escolheram arquivo', guardou: 'guardaram', baixou: 'baixaram pacote', pediu_link: 'pediram acesso', entrou: 'entraram' }
+async function funilView() {
+  const r = await api('/funil?dias=14'); if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar o funil.')
+  const produtosComDado = Object.entries(r.j.porProduto)
+  if (!produtosComDado.length) return h('div', {}, h('h2', {}, 'Funil da vitrine (14 dias)'), h('p', { class: 'vazio' }, 'Sem eventos ainda.'))
+  return h('div', {}, h('h2', {}, `Funil da vitrine (desde ${r.j.desde})`),
+    ...produtosComDado.map(([produto, c]) => {
+      const base = c.visita || 0
+      return h('div', {}, h('h3', {}, produto), tabela([['etapa', 'etapa'], ['total', 'total'], ['pct', '% das visitas']],
+        r.j.etapas.map((e) => ({ etapa: ROTULO_ETAPA[e] || e, total: c[e] || 0, pct: base ? `${Math.round(((c[e] || 0) / base) * 1000) / 10}%` : '-' })), ['total', 'pct']))
+    }),
+    h('p', { class: 'ajuda' }, 'Contadores agregados por dia, sem dado pessoal. "Visitas" conta uma por aba do navegador; robôs podem inflar os números do topo.'))
 }
 
 async function pedidosView() {

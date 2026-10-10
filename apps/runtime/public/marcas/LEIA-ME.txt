@@ -1,0 +1,2 @@
+Imagens de compartilhamento (og.png, 1200x630) por produto com marca.
+Geradas a partir do texto da marca com as fontes de /fontes, por captura de tela (Chromium). Refaça quando a promessa mudar.

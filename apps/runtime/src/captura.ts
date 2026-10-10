@@ -4,6 +4,7 @@ import { ancorar, atualizar, alturasBitcoin, zipStore, AGREGADORES_PADRAO } from
 import { produtos } from './registro.gerado'
 import { hojeBR, turnstileOk } from './publico'
 import { contaDaSessao } from './sessao'
+import { contar } from './vitrine'
 import type { Env } from './env'
 
 /**
@@ -183,6 +184,7 @@ capturaPublica.put('/:produto/captura', async (c) => {
       linha.ancora_calendarios, linha.chave_ots, linha.chave_ots_confirmada, linha.ots_altura, linha.vedado, linha.conta_id ?? null),
     c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'captura', ?, ?)").bind(id, oh, linha.gravado_em),
   ])
+  c.executionCtx.waitUntil(contar(c.env, p.nome, 'guardou'))
   return c.json({
     id, codigoDeRecuperacao: chaveUsuario, sha256: sha, manifestoSha256: manifestoSha, bytes: obj.size, recebidoEm: linha.gravado_em,
     ancora: linha.ancora, estado: caso.veredito.estado, motivo: caso.veredito.motivo, naConta: Boolean(contaId),
@@ -240,6 +242,7 @@ capturaPublica.post('/:produto/provas/:id/pacote', async (c) => {
   const chaveOts = r.chave_ots_confirmada ?? r.chave_ots
   const ots = chaveOts ? await c.env.PROVAS.get(chaveOts) : null
   if (!arq || !man) return c.json({ erro: 'objeto_ausente' }, 500)
+  c.executionCtx.waitUntil(contar(c.env, r.produto, 'baixou'))
   await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'pacote', ?, ?)").bind(r.id, await origemHash(c.env, c.req.header('cf-connecting-ip')), new Date().toISOString()).run()
   const entradas = [
     { nome: nomeSeguro(r.nome_arquivo), dados: arq.body },

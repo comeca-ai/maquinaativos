@@ -12,6 +12,15 @@ const hashCurto = (s) => `${s.slice(0, 16)}…${s.slice(-8)}`
 const baixarTexto = (nomeArq, texto) => { const u = URL.createObjectURL(new Blob([texto], { type: 'text/plain' })); const a = h('a', { href: u, download: nomeArq }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000) }
 const linkInterno = (href, ...filhos) => h('a', { href, 'data-link': true }, ...filhos)
 
+/** Contador anônimo do funil (agregado por dia no servidor; sem cookie, sem IP). */
+function evento(nome, etapa, umaVezPorSessao = false) {
+  const chave = `funil:${nome}:${etapa}`
+  try { if (umaVezPorSessao && sessionStorage.getItem(chave)) return; if (umaVezPorSessao) sessionStorage.setItem(chave, '1') } catch { /* sem storage: conta mesmo assim */ }
+  const url = `/pub/${encodeURIComponent(nome)}/evento`, corpo = JSON.stringify({ etapa })
+  try { if (navigator.sendBeacon?.(url, new Blob([corpo], { type: 'application/json' }))) return } catch { /* cai no fetch */ }
+  fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: corpo, keepalive: true }).catch(() => {})
+}
+
 async function estadoConta() {
   const r = await get('/pub/conta/eu')
   return r.ok ? r.j : { logado: false, loginDisponivel: false }
@@ -114,11 +123,13 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
     ferramenta.scrollIntoView({ behavior: 'smooth', block: 'center' }); aceite.focus({ preventScroll: true })
     return false
   }
-  aceite.addEventListener('change', () => { if (aceite.checked) { consentimento.classList.remove('pedir'); msg.textContent = '' } })
+  let consentiuContado = false
+  aceite.addEventListener('change', () => { if (aceite.checked) { consentimento.classList.remove('pedir'); msg.textContent = ''; if (!consentiuContado) { consentiuContado = true; evento(nome, 'consentiu') } } })
 
   const ocupado = (sim) => { ferramenta.querySelectorAll('button').forEach((b) => { b.disabled = sim }) }
   async function preservar(blob, nomeArquivo, origem) {
     if (blob.size > cfg.maxBytes) { msg.className = 'v-status erro'; msg.textContent = `Arquivo maior que ${maxMB} MB.`; return }
+    evento(nome, 'escolheu')
     ocupado(true); msg.className = 'v-status'; msg.textContent = 'Calculando a impressão digital no seu aparelho…'
     try {
       const sha = await sha256Hex(blob)
@@ -237,6 +248,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   const fixa = h('div', { class: 'v-fixa', hidden: true }, h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
   app.replaceChildren(heroi, cenas, pacote, como, perguntas, limites, fechamento, fixa)
+  evento(nome, 'visita', true)
 
   if ('IntersectionObserver' in window) {
     const visiveis = new Set()

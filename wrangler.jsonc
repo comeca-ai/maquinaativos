@@ -7,12 +7,13 @@
   "observability": { "enabled": true },
   "workers_dev": true,
   "preview_urls": false,
-  // Frontend estático no MESMO Worker. API e rotas públicas passam primeiro pelo código; o resto é arquivo.
+  // Frontend estático no MESMO Worker. API, rotas públicas e páginas HTML passam pelo código (meta tags da marca);
+  // JS, CSS, fontes e imagens vão direto para os arquivos.
   "assets": {
     "directory": "./apps/runtime/public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/pub/*", "/saude"]
+    "run_worker_first": ["/*", "!/*.js", "!/*.css", "!/fontes/*", "!/marcas/*"]
   },
   // Turnstile (opcional): `wrangler secret put TURNSTILE_SECRET` e defina TURNSTILE_SITEKEY aqui.
   // DOMINIOS: domínio -> produto que responde na raiz (JSON em texto).

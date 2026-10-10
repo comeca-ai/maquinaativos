@@ -4,6 +4,8 @@ import { produtos } from './registro.gerado'
 import { publico, hojeBR } from './publico'
 import { esteira } from './esteira'
 import { capturaPublica, capturaInterna, manutencaoCaptura } from './captura'
+import { conta, limparContas } from './conta'
+import { vitrinePublica, vitrineInterna, produtoDaPagina, comMetaDaMarca } from './vitrine'
 import type { Env } from './env'
 
 export { CasoWorkflow } from './workflow'
@@ -13,7 +15,9 @@ const app = new Hono<{ Bindings: Env }>()
 app.get('/saude', (c) => c.json({ ok: true, produtos: Object.keys(produtos) }))
 
 // Público: a experiência de cada produto, renderizada pelo framework a partir da `tela` declarada.
+app.route('/pub/conta', conta)
 app.route('/pub', publico)
+app.route('/pub', vitrinePublica)
 app.route('/pub', capturaPublica)
 
 // Interno: tudo em /api exige Bearer API_TOKEN (Studio). Cloudflare Access entra como 2ª camada.
@@ -106,16 +110,24 @@ api.get('/interesses', async (c) => {
 
 api.route('/', esteira)
 api.route('/', capturaInterna)
+api.route('/', vitrineInterna)
 
 app.route('/api', api)
 
 // Todo o resto (/, /studio, /<produto>) é arquivo estático / SPA, servido pelo binding ASSETS.
-app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
+app.all('*', async (c) => {
+  const r = await c.env.ASSETS.fetch(c.req.raw)
+  if (c.req.method !== 'GET' || !(r.headers.get('content-type') ?? '').includes('text/html')) return r
+  const url = new URL(c.req.url)
+  const p = produtoDaPagina(url, c.req.header('host') ?? '', c.env.DOMINIOS)
+  return p ? comMetaDaMarca(r, p, url) : r
+})
 
 export default {
   fetch: app.fetch,
   // Cron: ancora o que faltou, promove a Bitcoin o que já confirmou e reavalia casos abertos.
   async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(manutencaoCaptura(env).then((r) => console.log('manutencao-captura', JSON.stringify(r))))
+    ctx.waitUntil(limparContas(env))
   },
 } satisfies ExportedHandler<Env>

@@ -15,6 +15,14 @@ export interface Env {
   OTS_AGREGADORES?: string
   /** Domínio -> produto que responde na raiz, em JSON. Ex.: {"tinhaprint.com.br":"prova-digital"}. Opcional. */
   DOMINIOS?: string
+  /** Cloudflare Email Service (binding send_email). Sem ele, o login por link mágico responde 503. */
+  EMAIL?: SendEmail
+  /** Remetente do link mágico, ex.: "Tinha Print <acesso@tinhaprint.com.br>". O domínio precisa estar verificado no Email Service. */
+  EMAIL_REMETENTE?: string
+  /** Chave do HMAC do e-mail das contas. NÃO rotacione sem migração: trocar a chave desliga todas as contas das provas. */
+  SEGREDO_CONTA?: string
+  /** "ligado" para oferecer o login por e-mail. Desligado até o domínio do remetente estar verificado no Email Service. */
+  LOGIN_EMAIL?: string
 }
 
 export type ParamsCaso = {

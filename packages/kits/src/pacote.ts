@@ -11,6 +11,8 @@ export interface ResultadoPacote {
   alturasBitcoin: number[]
 }
 
+const RESERVADOS = new Set(['manifesto.json', 'prova.ots', 'LEIA-ME.txt', 'RELATORIO.html'])
+
 async function sha(b: Uint8Array) {
   const d = await crypto.subtle.digest('SHA-256', b)
   return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('')
@@ -21,7 +23,8 @@ export async function verificarPacote(arquivos: { nome: string; dados: Uint8Arra
   const marca = (ok: boolean, texto: string) => itens.push({ ok, texto })
   const man = arquivos.find((a) => a.nome === 'manifesto.json')
   const otsArq = arquivos.find((a) => a.nome === 'prova.ots')
-  const arq = arquivos.find((a) => !['manifesto.json', 'prova.ots', 'LEIA-ME.txt'].includes(a.nome))
+  // RELATORIO.html é só leitura humana dos registros: não entra na conferência (o que vale é arquivo + manifesto + .ots).
+  const arq = arquivos.find((a) => !RESERVADOS.has(a.nome))
   let ots: ResultadoPacote['ots'] = 'ausente'
   let alturas: number[] = []
 

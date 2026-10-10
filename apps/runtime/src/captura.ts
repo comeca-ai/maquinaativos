@@ -1,8 +1,11 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { executar, jsonEstavel, sha256 as sha256Texto, type FatosCaptura, type Produto } from '@maquina/core'
 import { ancorar, atualizar, alturasBitcoin, zipStore, AGREGADORES_PADRAO } from '@maquina/kits'
 import { produtos } from './registro.gerado'
 import { hojeBR, turnstileOk } from './publico'
+import { contaDaSessao, mesmaOrigem } from './sessao'
+import { contar } from './vitrine'
+import { CABECALHOS_RELATORIO, MAX_ACESSOS_RELATORIO, relatorioHtml, type AcessoRelatorio } from './relatorio'
 import type { Env } from './env'
 
 /**
@@ -23,7 +26,7 @@ function produtoDeCaptura(nome: string): Produto | null {
   return p?.captura ? p : null
 }
 
-async function origemHash(env: Env, ip: string | undefined): Promise<string> {
+export async function origemHash(env: Env, ip: string | undefined): Promise<string> {
   const chave = env.SEGREDO_ORIGEM || env.API_TOKEN || 'dev'
   const k = await crypto.subtle.importKey('raw', enc.encode(chave), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
   return hexDe(await crypto.subtle.sign('HMAC', k, enc.encode(ip ?? 'sem-ip')))
@@ -43,7 +46,7 @@ export interface LinhaProva {
   id: string; produto: string; caso_id: string; chave_hash: string; origem: string; nome_arquivo: string; mime: string; bytes: number
   sha256: string; manifesto_sha256: string; solicitado_em: string; gravado_em: string; gravado_em_dia: string; origem_hash: string
   volume_na_captura: number; ancora: 'nao_enviada' | 'enviada' | 'confirmada'; ancora_enviada_em: string | null
-  ancora_calendarios: number; chave_ots: string | null; chave_ots_confirmada: string | null; ots_altura: number | null; vedado: number
+  ancora_calendarios: number; chave_ots: string | null; chave_ots_confirmada: string | null; ots_altura: number | null; vedado: number; conta_id?: string | null
 }
 
 export function fatosDaProva(r: LinhaProva): FatosCaptura {
@@ -99,7 +102,7 @@ capturaPublica.get('/dominio', (c) => {
   return c.json({ produto: nome })
 })
 
-// PUT /pub/:produto/captura?nome=&sha256=&origem=navegador|arquivo_enviado&consentimento=1  (corpo = bytes do arquivo)
+// PUT /pub/:produto/captura?sha256=&origem=navegador|arquivo_enviado&consentimento=1  (corpo = bytes; nome em x-nome-arquivo)
 capturaPublica.put('/:produto/captura', async (c) => {
   const p = produtoDeCaptura(c.req.param('produto'))
   if (!p) return c.json({ erro: 'produto_sem_captura' }, 404)
@@ -136,6 +139,7 @@ capturaPublica.put('/:produto/captura', async (c) => {
     return c.json({ recusada: true, estado: caso.veredito.estado, motivo: caso.veredito.motivo }, 403)
   }
 
+  const contaId = await contaDaSessao(c) // enviada logado: a prova já nasce na conta
   const id = crypto.randomUUID()
   const chaveR2 = `provas/${id}/arquivo`
   let obj: R2Object | null = null
@@ -150,7 +154,10 @@ capturaPublica.put('/:produto/captura', async (c) => {
   const sha = obj.checksums.sha256 ? hexDe(obj.checksums.sha256) : hashCliente
 
   const agora = new Date()
-  const nome = nomeSeguro(q.nome)
+  // Nome do arquivo vem no cabeçalho (não na URL): a URL entra nos logs do Workers e o nome pode ser dado pessoal.
+  let nomeCabecalho: string | undefined
+  try { nomeCabecalho = c.req.header('x-nome-arquivo') ? decodeURIComponent(c.req.header('x-nome-arquivo')!) : undefined } catch { nomeCabecalho = undefined }
+  const nome = nomeSeguro(nomeCabecalho ?? q.nome)
   const manifesto = jsonEstavel({
     versaoManifesto: 1, produto: p.nome, produtoVersao: p.versao, provaId: id, origem,
     arquivo: { nome, mime, bytes: obj.size, sha256: sha },
@@ -164,73 +171,136 @@ capturaPublica.put('/:produto/captura', async (c) => {
   const linha: LinhaProva = {
     id, produto: p.nome, caso_id: '', chave_hash: await sha256Texto(chaveUsuario), origem, nome_arquivo: nome, mime, bytes: obj.size, sha256: sha,
     manifesto_sha256: manifestoSha, solicitado_em: hoje, gravado_em: agora.toISOString(), gravado_em_dia: diaBR(agora), origem_hash: oh,
-    volume_na_captura: anteriores + 1, ancora: 'nao_enviada', ancora_enviada_em: null, ancora_calendarios: 0, chave_ots: null, chave_ots_confirmada: null, ots_altura: null, vedado: 0,
+    volume_na_captura: anteriores + 1, ancora: 'nao_enviada', ancora_enviada_em: null, ancora_calendarios: 0, chave_ots: null, chave_ots_confirmada: null, ots_altura: null, vedado: 0, conta_id: contaId,
   }
   Object.assign(linha, await tentarAncorar(c.env, linha))
 
   const caso = await registrarCaso(c.env, p, null, fatosDaProva(linha))
   linha.caso_id = caso.casoId
   await c.env.DB.batch([
-    c.env.DB.prepare(`INSERT INTO provas (id, produto, caso_id, chave_hash, origem, nome_arquivo, mime, bytes, sha256, manifesto_sha256, solicitado_em, gravado_em, gravado_em_dia, origem_hash, volume_na_captura, ancora, ancora_enviada_em, ancora_calendarios, chave_ots, chave_ots_confirmada, ots_altura, vedado)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
+    c.env.DB.prepare(`INSERT INTO provas (id, produto, caso_id, chave_hash, origem, nome_arquivo, mime, bytes, sha256, manifesto_sha256, solicitado_em, gravado_em, gravado_em_dia, origem_hash, volume_na_captura, ancora, ancora_enviada_em, ancora_calendarios, chave_ots, chave_ots_confirmada, ots_altura, vedado, conta_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(
       linha.id, linha.produto, linha.caso_id, linha.chave_hash, linha.origem, linha.nome_arquivo, linha.mime, linha.bytes, linha.sha256, linha.manifesto_sha256,
       linha.solicitado_em, linha.gravado_em, linha.gravado_em_dia, linha.origem_hash, linha.volume_na_captura, linha.ancora, linha.ancora_enviada_em,
-      linha.ancora_calendarios, linha.chave_ots, linha.chave_ots_confirmada, linha.ots_altura, linha.vedado),
+      linha.ancora_calendarios, linha.chave_ots, linha.chave_ots_confirmada, linha.ots_altura, linha.vedado, linha.conta_id ?? null),
     c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'captura', ?, ?)").bind(id, oh, linha.gravado_em),
   ])
+  c.executionCtx.waitUntil(contar(c.env, p.nome, 'guardou'))
   return c.json({
     id, codigoDeRecuperacao: chaveUsuario, sha256: sha, manifestoSha256: manifestoSha, bytes: obj.size, recebidoEm: linha.gravado_em,
-    ancora: linha.ancora, estado: caso.veredito.estado, motivo: caso.veredito.motivo,
+    ancora: linha.ancora, estado: caso.veredito.estado, motivo: caso.veredito.motivo, naConta: Boolean(contaId),
   }, 201)
 })
 
-async function carregar(env: Env, produto: string, id: string, chave: unknown): Promise<LinhaProva | null> {
+export async function carregar(env: Env, produto: string, id: string, chave: unknown): Promise<LinhaProva | null> {
   if (typeof chave !== 'string' || chave.length < 16 || chave.length > 128) return null
   const r = await env.DB.prepare('SELECT * FROM provas WHERE id = ? AND produto = ?').bind(id, produto).first<LinhaProva>()
   if (!r) return null
   return iguaisConstante(r.chave_hash, await sha256Texto(chave)) ? r : null
 }
 
+/** Acesso pela chave (código de recuperação) OU pela sessão da conta dona da prova. */
+async function carregarComAcesso(c: Context<{ Bindings: Env }>, chave: unknown): Promise<LinhaProva | null> {
+  const produto = c.req.param('produto')!, id = c.req.param('id')!
+  if (chave) return carregar(c.env, produto, id, chave)
+  const contaId = await contaDaSessao(c)
+  if (!contaId) return null
+  return c.env.DB.prepare('SELECT * FROM provas WHERE id = ? AND produto = ? AND conta_id = ?').bind(id, produto, contaId).first<LinhaProva>()
+}
+
 capturaPublica.post('/:produto/provas/:id/estado', async (c) => {
   const corpo = (await c.req.json().catch(() => null)) as { chave?: string } | null
-  const r = await carregar(c.env, c.req.param('produto'), c.req.param('id'), corpo?.chave)
+  const r = await carregarComAcesso(c, corpo?.chave)
   if (!r) return c.json({ erro: 'nao_encontrada' }, 404) // mesma resposta para id inexistente e chave errada
   const caso = await c.env.DB.prepare('SELECT estado, motivo, final, prazo_ate FROM casos WHERE id = ?').bind(r.caso_id).first()
   return c.json({ id: r.id, nome: r.nome_arquivo, bytes: r.bytes, sha256: r.sha256, manifestoSha256: r.manifesto_sha256, recebidoEm: r.gravado_em, ancora: r.ancora, otsAltura: r.ots_altura, vedado: r.vedado === 1, caso })
 })
 
+/** Nomes reservados dentro do pacote: o arquivo do usuário nunca colide com eles. */
+const RESERVADOS_PACOTE = new Set(['manifesto.json', 'prova.ots', 'leia-me.txt', 'relatorio.html'])
+const nomeNoPacote = (n: string) => { const s = nomeSeguro(n); return RESERVADOS_PACOTE.has(s.toLowerCase()) ? `arquivo-${s}` : s }
+
 const LEIA_ME = (r: LinhaProva) => `PACOTE DE PROVA DIGITAL ${r.id}
 
 Arquivos:
-  arquivo (${r.nome_arquivo})  o arquivo preservado, byte a byte
+  ${nomeNoPacote(r.nome_arquivo)}  o arquivo preservado, byte a byte
   manifesto.json               registro do recebimento: hash do arquivo, tamanho, tipo, data/hora do servidor
   prova.ots                    carimbo OpenTimestamps do manifesto (ancorado no Bitcoin; pendente nas primeiras horas)
+  RELATORIO.html               relatório para ler, imprimir ou salvar em PDF (abra no navegador)
 
 Como verificar SEM depender do nosso servidor:
   1) sha256sum <arquivo>  -> deve ser igual a arquivo.sha256 dentro de manifesto.json (${r.sha256})
+     (Windows: certutil -hashfile <arquivo> SHA256   Mac: shasum -a 256 <arquivo>)
   2) sha256sum manifesto.json -> deve ser ${r.manifesto_sha256}
   3) ots verify prova.ots   (cliente oficial: https://github.com/opentimestamps/opentimestamps-client)
+     ou em https://opentimestamps.org, soltando prova.ots e manifesto.json
      Se ainda estiver pendente: ots upgrade prova.ots   (depois de algumas horas)
   4) Ou rode o verificador deste projeto: node scripts/verificar-pacote.mjs <pasta-ou-zip>
 
 O que este pacote prova: que ESTE arquivo existia nesta data e não foi alterado desde então.
 O que NÃO prova: que o conteúdo é verdadeiro, nem que será aceito como prova. Isso é decisão do juiz.
+Sem certificação ICP-Brasil: não há assinatura digital nem carimbo de tempo ICP-Brasil neste pacote.
 `
+
+/** Junta tudo o que o cofre tem sobre a prova e devolve o HTML do relatório. Chamar DEPOIS de registrar o acesso atual. */
+async function montarRelatorio(env: Env, r: LinhaProva, site: string): Promise<string | null> {
+  const man = await env.PROVAS.get(`provas/${r.id}/manifesto.json`)
+  if (!man) return null
+  const [caso, total, recentes] = await Promise.all([
+    env.DB.prepare('SELECT estado, motivo, final FROM casos WHERE id = ?').bind(r.caso_id).first<{ estado: string; motivo: string; final: number }>(),
+    env.DB.prepare('SELECT COUNT(*) AS n FROM acessos WHERE prova_id = ?').bind(r.id).first<{ n: number }>(),
+    env.DB.prepare('SELECT tipo, origem_hash, em FROM acessos WHERE prova_id = ? ORDER BY id DESC LIMIT ?').bind(r.id, MAX_ACESSOS_RELATORIO).all<AcessoRelatorio>(),
+  ])
+  const marca = produtos[r.produto]?.captura?.marca
+  return relatorioHtml({
+    marca: marca?.nome ?? r.produto, baseLegal: marca?.baseLegal, site, geradoEm: new Date(),
+    prova: r, manifesto: await man.text(), caso: caso ?? null,
+    acessos: [...recentes.results].reverse(), totalAcessos: total?.n ?? recentes.results.length,
+  })
+}
+
+/** Página curta de erro para quando o relatório é aberto numa aba nova (navegação, não fetch). */
+const paginaErro = (texto: string) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório indisponível</title></head><body style="margin:0;padding:32px 18px;font:16px/1.5 system-ui,sans-serif;background:#fbfaf6;color:#161513"><p>${texto}</p></body></html>`
+
+/** Chave do corpo: JSON (fetch) ou formulário (aba nova). */
+async function chaveDoCorpo(c: Context<{ Bindings: Env }>): Promise<string | undefined> {
+  const tipo = c.req.header('content-type') ?? ''
+  if (tipo.includes('application/json')) return ((await c.req.json().catch(() => null)) as { chave?: string } | null)?.chave
+  if (tipo.includes('form')) { const f = await c.req.parseBody().catch(() => ({} as Record<string, unknown>)); return typeof f.chave === 'string' && f.chave ? f.chave : undefined }
+  return undefined
+}
+
+// POST /pub/:produto/provas/:id/relatorio  (chave ou sessão; responde HTML para abrir numa aba)
+capturaPublica.post('/:produto/provas/:id/relatorio', async (c) => {
+  const html = (status: 403 | 404 | 451 | 500, texto: string) => c.html(paginaErro(texto), status, { 'cache-control': 'no-store' })
+  if (!mesmaOrigem(c)) return html(403, 'Abra o relatório pela página do serviço.')
+  const r = await carregarComAcesso(c, await chaveDoCorpo(c))
+  if (!r) return html(404, 'Código ou identificador não confere.')
+  if (r.vedado) return html(451, 'Esta prova não está disponível.')
+  await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'relatorio', ?, ?)").bind(r.id, await origemHash(c.env, c.req.header('cf-connecting-ip')), new Date().toISOString()).run()
+  const corpo = await montarRelatorio(c.env, r, new URL(c.req.url).origin)
+  if (!corpo) return html(500, 'Não foi possível montar o relatório agora.')
+  return new Response(corpo, { headers: { ...CABECALHOS_RELATORIO, 'content-disposition': `inline; filename="relatorio-${r.id}.html"` } })
+})
 
 capturaPublica.post('/:produto/provas/:id/pacote', async (c) => {
   const corpo = (await c.req.json().catch(() => null)) as { chave?: string } | null
-  const r = await carregar(c.env, c.req.param('produto'), c.req.param('id'), corpo?.chave)
+  const r = await carregarComAcesso(c, corpo?.chave)
   if (!r) return c.json({ erro: 'nao_encontrada' }, 404)
   if (r.vedado) return c.json({ erro: 'indisponivel' }, 451)
   const [arq, man] = await Promise.all([c.env.PROVAS.get(`provas/${r.id}/arquivo`), c.env.PROVAS.get(`provas/${r.id}/manifesto.json`)])
   const chaveOts = r.chave_ots_confirmada ?? r.chave_ots
   const ots = chaveOts ? await c.env.PROVAS.get(chaveOts) : null
   if (!arq || !man) return c.json({ erro: 'objeto_ausente' }, 500)
+  c.executionCtx.waitUntil(contar(c.env, r.produto, 'baixou'))
+  // Registra o acesso ANTES de montar o relatório: o download atual aparece na cadeia de custódia do próprio pacote.
   await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'pacote', ?, ?)").bind(r.id, await origemHash(c.env, c.req.header('cf-connecting-ip')), new Date().toISOString()).run()
+  const relatorio = await montarRelatorio(c.env, r, new URL(c.req.url).origin)
   const entradas = [
-    { nome: nomeSeguro(r.nome_arquivo), dados: arq.body },
+    { nome: nomeNoPacote(r.nome_arquivo), dados: arq.body },
     { nome: 'manifesto.json', dados: new Uint8Array(await man.arrayBuffer()) },
     ...(ots ? [{ nome: 'prova.ots', dados: new Uint8Array(await ots.arrayBuffer()) }] : []),
+    ...(relatorio ? [{ nome: 'RELATORIO.html', dados: enc.encode(relatorio) }] : []),
     { nome: 'LEIA-ME.txt', dados: enc.encode(LEIA_ME(r)) },
   ]
   return new Response(zipStore(entradas, new Date(r.gravado_em)), {
@@ -266,6 +336,16 @@ capturaInterna.get('/provas/:id/arquivo', async (c) => {
   const o = await c.env.PROVAS.get(`provas/${r.id}/arquivo`)
   if (!o) return c.json({ erro: 'objeto_ausente' }, 500)
   return new Response(o.body, { headers: { 'content-type': r.mime, 'content-disposition': `attachment; filename="${nomeSeguro(r.nome_arquivo)}"`, 'cache-control': 'no-store' } })
+})
+
+// Equipe vê o relatório (sem o arquivo), com registro no log.
+capturaInterna.get('/provas/:id/relatorio', async (c) => {
+  const r = await c.env.DB.prepare('SELECT * FROM provas WHERE id = ?').bind(c.req.param('id')).first<LinhaProva>()
+  if (!r) return c.json({ erro: 'prova_inexistente' }, 404)
+  await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'relatorio', 'equipe', ?)").bind(r.id, new Date().toISOString()).run()
+  const corpo = await montarRelatorio(c.env, r, new URL(c.req.url).origin)
+  if (!corpo) return c.json({ erro: 'objeto_ausente' }, 500)
+  return new Response(corpo, { headers: CABECALHOS_RELATORIO })
 })
 
 capturaInterna.get('/provas/:id/acessos', async (c) => {
@@ -312,8 +392,9 @@ export async function manutencaoCaptura(env: Env): Promise<{ ancoradas: number; 
         }
       }
     }
-    const caso = await env.DB.prepare('SELECT final FROM casos WHERE id = ?').bind(r.caso_id).first<{ final: number }>()
-    if (caso && !caso.final) {
+    // Reavalia só quando um fato mudou ou o prazo do estado chegou: evita um Workflow por prova a cada hora (custo de steps).
+    const caso = await env.DB.prepare('SELECT final, prazo_ate FROM casos WHERE id = ?').bind(r.caso_id).first<{ final: number; prazo_ate: string | null }>()
+    if (caso && !caso.final && (mudou || !caso.prazo_ate || caso.prazo_ate <= hojeBR())) {
       await registrarCaso(env, p, r.caso_id, fatosDaProva(r)).catch(() => undefined)
       reavaliadas++
     } else if (mudou) {

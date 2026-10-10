@@ -3,8 +3,9 @@ import { executar, jsonEstavel, sha256 as sha256Texto, type FatosCaptura, type P
 import { ancorar, atualizar, alturasBitcoin, zipStore, AGREGADORES_PADRAO } from '@maquina/kits'
 import { produtos } from './registro.gerado'
 import { hojeBR, turnstileOk } from './publico'
-import { contaDaSessao } from './sessao'
+import { contaDaSessao, mesmaOrigem } from './sessao'
 import { contar } from './vitrine'
+import { CABECALHOS_RELATORIO, MAX_ACESSOS_RELATORIO, relatorioHtml, type AcessoRelatorio } from './relatorio'
 import type { Env } from './env'
 
 /**
@@ -215,23 +216,72 @@ capturaPublica.post('/:produto/provas/:id/estado', async (c) => {
   return c.json({ id: r.id, nome: r.nome_arquivo, bytes: r.bytes, sha256: r.sha256, manifestoSha256: r.manifesto_sha256, recebidoEm: r.gravado_em, ancora: r.ancora, otsAltura: r.ots_altura, vedado: r.vedado === 1, caso })
 })
 
+/** Nomes reservados dentro do pacote: o arquivo do usuário nunca colide com eles. */
+const RESERVADOS_PACOTE = new Set(['manifesto.json', 'prova.ots', 'leia-me.txt', 'relatorio.html'])
+const nomeNoPacote = (n: string) => { const s = nomeSeguro(n); return RESERVADOS_PACOTE.has(s.toLowerCase()) ? `arquivo-${s}` : s }
+
 const LEIA_ME = (r: LinhaProva) => `PACOTE DE PROVA DIGITAL ${r.id}
 
 Arquivos:
-  arquivo (${r.nome_arquivo})  o arquivo preservado, byte a byte
+  ${nomeNoPacote(r.nome_arquivo)}  o arquivo preservado, byte a byte
   manifesto.json               registro do recebimento: hash do arquivo, tamanho, tipo, data/hora do servidor
   prova.ots                    carimbo OpenTimestamps do manifesto (ancorado no Bitcoin; pendente nas primeiras horas)
+  RELATORIO.html               relatório para ler, imprimir ou salvar em PDF (abra no navegador)
 
 Como verificar SEM depender do nosso servidor:
   1) sha256sum <arquivo>  -> deve ser igual a arquivo.sha256 dentro de manifesto.json (${r.sha256})
+     (Windows: certutil -hashfile <arquivo> SHA256   Mac: shasum -a 256 <arquivo>)
   2) sha256sum manifesto.json -> deve ser ${r.manifesto_sha256}
   3) ots verify prova.ots   (cliente oficial: https://github.com/opentimestamps/opentimestamps-client)
+     ou em https://opentimestamps.org, soltando prova.ots e manifesto.json
      Se ainda estiver pendente: ots upgrade prova.ots   (depois de algumas horas)
   4) Ou rode o verificador deste projeto: node scripts/verificar-pacote.mjs <pasta-ou-zip>
 
 O que este pacote prova: que ESTE arquivo existia nesta data e não foi alterado desde então.
 O que NÃO prova: que o conteúdo é verdadeiro, nem que será aceito como prova. Isso é decisão do juiz.
+Sem certificação ICP-Brasil: não há assinatura digital nem carimbo de tempo ICP-Brasil neste pacote.
 `
+
+/** Junta tudo o que o cofre tem sobre a prova e devolve o HTML do relatório. Chamar DEPOIS de registrar o acesso atual. */
+async function montarRelatorio(env: Env, r: LinhaProva, site: string): Promise<string | null> {
+  const man = await env.PROVAS.get(`provas/${r.id}/manifesto.json`)
+  if (!man) return null
+  const [caso, total, recentes] = await Promise.all([
+    env.DB.prepare('SELECT estado, motivo, final FROM casos WHERE id = ?').bind(r.caso_id).first<{ estado: string; motivo: string; final: number }>(),
+    env.DB.prepare('SELECT COUNT(*) AS n FROM acessos WHERE prova_id = ?').bind(r.id).first<{ n: number }>(),
+    env.DB.prepare('SELECT tipo, origem_hash, em FROM acessos WHERE prova_id = ? ORDER BY id DESC LIMIT ?').bind(r.id, MAX_ACESSOS_RELATORIO).all<AcessoRelatorio>(),
+  ])
+  const marca = produtos[r.produto]?.captura?.marca
+  return relatorioHtml({
+    marca: marca?.nome ?? r.produto, baseLegal: marca?.baseLegal, site, geradoEm: new Date(),
+    prova: r, manifesto: await man.text(), caso: caso ?? null,
+    acessos: [...recentes.results].reverse(), totalAcessos: total?.n ?? recentes.results.length,
+  })
+}
+
+/** Página curta de erro para quando o relatório é aberto numa aba nova (navegação, não fetch). */
+const paginaErro = (texto: string) => `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório indisponível</title></head><body style="margin:0;padding:32px 18px;font:16px/1.5 system-ui,sans-serif;background:#fbfaf6;color:#161513"><p>${texto}</p></body></html>`
+
+/** Chave do corpo: JSON (fetch) ou formulário (aba nova). */
+async function chaveDoCorpo(c: Context<{ Bindings: Env }>): Promise<string | undefined> {
+  const tipo = c.req.header('content-type') ?? ''
+  if (tipo.includes('application/json')) return ((await c.req.json().catch(() => null)) as { chave?: string } | null)?.chave
+  if (tipo.includes('form')) { const f = await c.req.parseBody().catch(() => ({} as Record<string, unknown>)); return typeof f.chave === 'string' && f.chave ? f.chave : undefined }
+  return undefined
+}
+
+// POST /pub/:produto/provas/:id/relatorio  (chave ou sessão; responde HTML para abrir numa aba)
+capturaPublica.post('/:produto/provas/:id/relatorio', async (c) => {
+  const html = (status: 403 | 404 | 451 | 500, texto: string) => c.html(paginaErro(texto), status, { 'cache-control': 'no-store' })
+  if (!mesmaOrigem(c)) return html(403, 'Abra o relatório pela página do serviço.')
+  const r = await carregarComAcesso(c, await chaveDoCorpo(c))
+  if (!r) return html(404, 'Código ou identificador não confere.')
+  if (r.vedado) return html(451, 'Esta prova não está disponível.')
+  await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'relatorio', ?, ?)").bind(r.id, await origemHash(c.env, c.req.header('cf-connecting-ip')), new Date().toISOString()).run()
+  const corpo = await montarRelatorio(c.env, r, new URL(c.req.url).origin)
+  if (!corpo) return html(500, 'Não foi possível montar o relatório agora.')
+  return new Response(corpo, { headers: { ...CABECALHOS_RELATORIO, 'content-disposition': `inline; filename="relatorio-${r.id}.html"` } })
+})
 
 capturaPublica.post('/:produto/provas/:id/pacote', async (c) => {
   const corpo = (await c.req.json().catch(() => null)) as { chave?: string } | null
@@ -243,11 +293,14 @@ capturaPublica.post('/:produto/provas/:id/pacote', async (c) => {
   const ots = chaveOts ? await c.env.PROVAS.get(chaveOts) : null
   if (!arq || !man) return c.json({ erro: 'objeto_ausente' }, 500)
   c.executionCtx.waitUntil(contar(c.env, r.produto, 'baixou'))
+  // Registra o acesso ANTES de montar o relatório: o download atual aparece na cadeia de custódia do próprio pacote.
   await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'pacote', ?, ?)").bind(r.id, await origemHash(c.env, c.req.header('cf-connecting-ip')), new Date().toISOString()).run()
+  const relatorio = await montarRelatorio(c.env, r, new URL(c.req.url).origin)
   const entradas = [
-    { nome: nomeSeguro(r.nome_arquivo), dados: arq.body },
+    { nome: nomeNoPacote(r.nome_arquivo), dados: arq.body },
     { nome: 'manifesto.json', dados: new Uint8Array(await man.arrayBuffer()) },
     ...(ots ? [{ nome: 'prova.ots', dados: new Uint8Array(await ots.arrayBuffer()) }] : []),
+    ...(relatorio ? [{ nome: 'RELATORIO.html', dados: enc.encode(relatorio) }] : []),
     { nome: 'LEIA-ME.txt', dados: enc.encode(LEIA_ME(r)) },
   ]
   return new Response(zipStore(entradas, new Date(r.gravado_em)), {
@@ -283,6 +336,16 @@ capturaInterna.get('/provas/:id/arquivo', async (c) => {
   const o = await c.env.PROVAS.get(`provas/${r.id}/arquivo`)
   if (!o) return c.json({ erro: 'objeto_ausente' }, 500)
   return new Response(o.body, { headers: { 'content-type': r.mime, 'content-disposition': `attachment; filename="${nomeSeguro(r.nome_arquivo)}"`, 'cache-control': 'no-store' } })
+})
+
+// Equipe vê o relatório (sem o arquivo), com registro no log.
+capturaInterna.get('/provas/:id/relatorio', async (c) => {
+  const r = await c.env.DB.prepare('SELECT * FROM provas WHERE id = ?').bind(c.req.param('id')).first<LinhaProva>()
+  if (!r) return c.json({ erro: 'prova_inexistente' }, 404)
+  await c.env.DB.prepare("INSERT INTO acessos (prova_id, tipo, origem_hash, em) VALUES (?, 'relatorio', 'equipe', ?)").bind(r.id, new Date().toISOString()).run()
+  const corpo = await montarRelatorio(c.env, r, new URL(c.req.url).origin)
+  if (!corpo) return c.json({ erro: 'objeto_ausente' }, 500)
+  return new Response(corpo, { headers: CABECALHOS_RELATORIO })
 })
 
 capturaInterna.get('/provas/:id/acessos', async (c) => {

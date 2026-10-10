@@ -46,6 +46,17 @@ export async function baixarPacote(nome, id, chave, msg) {
   setTimeout(() => URL.revokeObjectURL(url), 15000); msg.textContent = 'Pacote baixado.'
 }
 
+/**
+ * Abre o relatório da prova numa aba nova. É um formulário POST (não fetch + blob) porque assim funciona igual no
+ * celular: o código de recuperação vai no corpo, nunca na URL. Sem `chave`, vale a sessão da conta dona da prova.
+ */
+export function abrirRelatorio(nome, id, chave) {
+  const f = h('form', { method: 'post', action: `/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id)}/relatorio`, target: '_blank', rel: 'noopener' },
+    chave ? h('input', { type: 'hidden', name: 'chave', value: chave }) : null)
+  f.style.display = 'none'
+  document.body.append(f); f.submit(); f.remove()
+}
+
 /** Envia com progresso (XHR, porque fetch não informa progresso de upload). */
 export function enviarComProgresso(url, blob, headers, aoProgredir) {
   return new Promise((resolve) => {

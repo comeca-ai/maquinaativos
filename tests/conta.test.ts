@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cookieSessao, lerCookie, normalizarEmail, remetente, tokenAleatorio, tokenValido, hmacHex } from '../apps/runtime/src/sessao'
+import { cookieSessao, lerCookie, mesmaOrigem, normalizarEmail, remetente, tokenAleatorio, tokenValido, hmacHex } from '../apps/runtime/src/sessao'
 
 describe('link mágico: utilitários puros', () => {
   it('token tem 256 bits em base64url e é sempre diferente', () => {
@@ -44,5 +44,15 @@ describe('link mágico: utilitários puros', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/)
     expect(await hmacHex('k1', 'email:a@b.com')).toBe(a)
     expect(await hmacHex('k2', 'email:a@b.com')).not.toBe(a)
+  })
+
+  it('mesma origem: Origin igual, ou Origin "null" com Sec-Fetch-Site same-origin (formulário em aba nova)', () => {
+    const ctx = (h: Record<string, string>) => ({ req: { url: 'https://tinhaprint.com.br/pub/x', header: (n: string) => h[n] } }) as never
+    expect(mesmaOrigem(ctx({ origin: 'https://tinhaprint.com.br' }))).toBe(true)
+    expect(mesmaOrigem(ctx({ origin: 'https://golpe.example' }))).toBe(false)
+    expect(mesmaOrigem(ctx({ origin: 'https://golpe.example', 'sec-fetch-site': 'same-origin' }))).toBe(false)
+    expect(mesmaOrigem(ctx({ origin: 'null', 'sec-fetch-site': 'same-origin' }))).toBe(true)
+    expect(mesmaOrigem(ctx({ origin: 'null', 'sec-fetch-site': 'cross-site' }))).toBe(false)
+    expect(mesmaOrigem(ctx({}))).toBe(false)
   })
 })

@@ -13,6 +13,8 @@ export interface Env {
   SEGREDO_ORIGEM?: string
   /** Agregadores OpenTimestamps separados por vírgula (opcional; padrão do kit). */
   OTS_AGREGADORES?: string
+  /** Domínio -> produto que responde na raiz, em JSON. Ex.: {"tinhaprint.com.br":"prova-digital"}. Opcional. */
+  DOMINIOS?: string
 }
 
 export type ParamsCaso = {

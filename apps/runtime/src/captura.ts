@@ -85,8 +85,18 @@ async function tentarAncorar(env: Env, r: LinhaProva): Promise<Partial<LinhaProv
 capturaPublica.get('/:produto/captura', (c) => {
   const p = produtoDeCaptura(c.req.param('produto'))
   if (!p) return c.json({ erro: 'produto_sem_captura' }, 404)
-  const { titulo, subtitulo, aviso, tiposMime, maxBytes } = p.captura!
-  return c.json({ nome: p.nome, versao: p.versao, titulo, subtitulo, aviso, tiposMime, maxBytes, turnstileSitekey: c.env.TURNSTILE_SITEKEY ?? null, preco: p.preco ?? null })
+  const { titulo, subtitulo, aviso, tiposMime, maxBytes, marca } = p.captura!
+  return c.json({ nome: p.nome, versao: p.versao, titulo, subtitulo, aviso, tiposMime, maxBytes, marca: marca ?? null, turnstileSitekey: c.env.TURNSTILE_SITEKEY ?? null, preco: p.preco ?? null })
+})
+
+// GET /pub/dominio — qual produto responde na raiz deste host? (DOMINIOS = JSON {"tinhaprint.com.br":"prova-digital"})
+capturaPublica.get('/dominio', (c) => {
+  let mapa: Record<string, string> = {}
+  try { mapa = JSON.parse(c.env.DOMINIOS ?? '{}') } catch { /* config inválida = sem domínio mapeado */ }
+  const host = (c.req.header('host') ?? '').toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '')
+  const nome = Object.hasOwn(mapa, host) ? mapa[host] : undefined
+  if (!nome || !produtoDeCaptura(nome)) return c.json({ erro: 'sem_dominio' }, 404)
+  return c.json({ produto: nome })
 })
 
 // PUT /pub/:produto/captura?nome=&sha256=&origem=navegador|arquivo_enviado&consentimento=1  (corpo = bytes do arquivo)

@@ -28,7 +28,11 @@ async function rotear() {
   limpar()
   app.classList.remove('studio')
   const partes = location.pathname.split('/').filter(Boolean)
-  if (partes.length === 0) return paginaInicial()
+  if (partes.length === 0) {
+    const d = await get('/pub/dominio')
+    if (d.ok && d.j.produto) return paginaProduto(d.j.produto)
+    return paginaInicial()
+  }
   if (partes[0] === 'studio') return studio()
   return paginaProduto(partes[0])
 }
@@ -213,8 +217,30 @@ async function baixarPacote(nome, id, chave, msg) {
   setTimeout(() => URL.revokeObjectURL(url), 15000); msg.textContent = 'Pacote baixado.'
 }
 
+function marcaHero(m) {
+  document.title = m.nome + ' — ' + m.promessa
+  const topo = document.querySelector('.topo .marca')
+  if (topo) {
+    const base = m.destaque ? m.nome.slice(0, m.nome.length - m.destaque.length) : m.nome
+    topo.replaceChildren(base, ...(m.destaque ? [h('span', {}, m.destaque)] : []))
+    topo.setAttribute('href', location.pathname)
+  }
+}
+
+function marcaDepois(m) {
+  return h('div', { class: 'marca-info' },
+    h('h2', {}, 'Como funciona'),
+    h('ol', { class: 'passos' }, m.passos.map((x) => h('li', {}, h('strong', {}, x.titulo), h('span', {}, x.texto)))),
+    m.perguntas.length ? h('h2', {}, 'Perguntas que todo mundo faz') : null,
+    m.perguntas.map((x) => h('details', { class: 'faq' }, h('summary', {}, x.pergunta), h('p', {}, x.resposta))),
+    h('h2', {}, 'O que a gente não faz'),
+    h('ul', { class: 'limites' }, m.limites.map((x) => h('li', {}, x))))
+}
+
 function paginaCaptura(nome, cfg) {
   document.title = cfg.titulo
+  const marca = cfg.marca
+  if (marca) marcaHero(marca)
   let tokenTurnstile = null
   const maxMB = Math.round(cfg.maxBytes / 1048576)
   const aceite = h('input', { type: 'checkbox', id: 'aceite-captura' })
@@ -298,9 +324,9 @@ function paginaCaptura(nome, cfg) {
   })
 
   const recuperar = recuperarForm(nome)
-  app.append(h('h1', {}, cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso),
+  app.append(h('h1', {}, marca ? marca.promessa : cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso),
     h('label', { class: 'consent', for: 'aceite-captura' }, aceite, 'Autorizo guardar este arquivo em cofre privado e enviar apenas o seu hash (uma impressão digital, nunca o conteúdo) a calendários públicos OpenTimestamps. Não guardamos o seu IP.'),
-    botoes, h('label', { for: 'arq' }, `Ou envie um arquivo (até ${maxMB} MB)`), arquivo, msg, saida, h('hr', { class: 'sep' }), recuperar)
+    botoes, h('label', { for: 'arq' }, `Ou envie um arquivo (até ${maxMB} MB)`), arquivo, msg, saida, h('hr', { class: 'sep' }), recuperar, marca ? marcaDepois(marca) : null)
 
   if (cfg.turnstileSitekey) {
     const alvo = h('div'); app.insertBefore(alvo, botoes)

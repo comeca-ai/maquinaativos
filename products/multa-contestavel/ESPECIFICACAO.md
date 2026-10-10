@@ -1,4 +1,4 @@
-# Multa Contestável — Especificação Detalhada (v2)
+# Multa Contestável — Especificação Detalhada (v2.1)
 
 > Documento de produto completo. A v1 (`SPEC.md`) continua sendo o contrato mínimo vivo;
 > esta especificação é o plano de evolução. Filosofia máquina de ativos: **IA generativa só
@@ -29,20 +29,54 @@ radical (às vezes recomendamos PAGAR).
 3. Matemática: desconto 40% vs. recorrer      [grátis — viraliza]
 4. Minuta de defesa prévia personalizada      [PAGO: R$ 27–47 via PIX]
    + guia de protocolo do SEU órgão autuador
+   + prova social REAL no momento da decisão (ver 2.1)
+4b. Envio por você (onde o portal permite)    [PREMIUM: +R$ 20–30 — ver 2.2]
 5. Acompanhamento de prazo (lembretes)        [grátis — retorno]
 6. Se indeferido: minuta JARI                 [pago ou incluso]
 7. Clube motorista profissional               [R$ 14,90/mês — fase 3]
 ```
 
-**Garantia invertida (fase 2, não no lançamento):** "se indeferido, devolvemos 100%".
+### 2.1 Prova social no ponto de captura (copy evolutiva)
+
+A tela de pagamento mostra a melhor prova **verdadeira** disponível no momento:
+
+| Estágio do produto | O que a tela diz |
+|---|---|
+| Lançamento (sem dados) | fundamento legal da tese ("esse erro está na Res. Contran 918/2022, art. 4º") |
+| 90 dias de `resultados` | taxa real por órgão/tese ("78% de deferimento em casos como o seu no Detran-PB") |
+| Escala | valor agregado ("R$ 47 mil em multas canceladas para motoristas") |
+
+**Regras invioláveis:** número inventado nunca; promessa de resultado nunca
+("pode cancelar", nunca "vai cancelar"); a fonte do número é a nossa própria
+tabela `resultados`, auditável. A honestidade radical é o fosso competitivo —
+inflar estatística destrói o produto inteiro.
+
+### 2.2 Envio por você (premium, com fronteira técnica clara)
+
+Muitos portais (PRF, vários Detrans) aceitam defesa **só com os dados do AIT, sem
+login gov.br**. Nesses órgãos, oferecemos o envio pelo usuário como upgrade:
+
+- O usuário assina uma **declaração/autorização** (assinatura gov.br, Decreto
+  10.543/2020) nos autorizando a protocolar em seu nome;
+- Automação (Browser Rendering/Playwright) preenche o portal com os dados do caso;
+- O **comprovante de protocolo** volta para o usuário **carimbado no Tinha Print**
+  (cross-sell natural do ecossistema: prova de que enviamos, quando enviamos);
+- Onde o portal **exigir login gov.br pessoal**, a regra é sagrada: **nunca pedimos
+  a senha.** Guiamos até a porta; quem envia é o motorista.
+
+Cada órgão no dataset `orgaos_autuadores` carrega a flag
+`aceita_envio_terceiro` (sim/não) e `exige_login_govbr` (sim/não) — a tela oferece
+o premium apenas onde é tecnicamente possível.
+
+**Garantia invertida (fase 2.5, não no lançamento):** "se indeferido, devolvemos 100%".
 Só ligar depois de medir a taxa real de deferimento nos primeiros 90 dias — a garantia
 é sustentável apenas se o motor de teses provar acerto. O cliente prova o indeferimento
 para receber a devolução — ou seja, ele mesmo alimenta nossa métrica de resultado.
 
 **O que NÃO faremos (reforço ao NAO-FAREMOS.md):**
 - Não cobramos % do valor da multa (êxito): incentivo podre + cobrança impossível.
-- Não protocolamos pelo usuário: portais exigem login gov.br pessoal; pedir senha é
-  problema jurídico e de segurança. Guiamos até a porta; quem envia é o motorista.
+- Não pedimos senha gov.br em nenhuma hipótese. Envio pelo usuário só onde o portal
+  aceita terceiro sem login pessoal, mediante autorização assinada.
 
 ---
 
@@ -63,7 +97,7 @@ veredito. IA propõe, humano confirma, regra decide.
 | Dataset | Conteúdo | Fonte | Manutenção |
 |---|---|---|---|
 | `infracoes_ctb` | código → descrição, pontos, valor base, órgão competente | Anexo I CTB / Renainf | revisão semestral |
-| `orgaos_autuadores` | órgão → UF, portal de protocolo, docs exigidos, formato, limite de MB | pesquisa manual portal a portal | curadoria contínua; começa com Detran-SP, RJ, PR, RS, SC, MG, PB + PRF + DNIT |
+| `orgaos_autuadores` | órgão → UF, portal, docs exigidos, formato, limite MB, `aceita_envio_terceiro`, `exige_login_govbr` | pesquisa manual portal a portal | curadoria contínua; começa com Detran-SP, RJ, PR, RS, SC, MG, PB + PRF + DNIT |
 | `teses_defesa` | tese → gatilhos, fundamentos, template de minuta | CTB arts. 280–290, Res. 918/2022 | advogado revisa antes de publicar |
 
 ### 3.3 O que NÃO existe (e precisa estar no spec)
@@ -120,13 +154,14 @@ Estados atuais preservados. Evoluções:
 | Workers AI | OCR assistido da notificação (modelo de visão) — só preenche formulário | ⬜ avaliar `@cf/llava-hf/llava-1.5-7b-hf`; fallback = formulário manual |
 | Cron Triggers | lembretes de prazo de defesa (D-7, D-2, D-1) | ⬜ novo |
 | Turnstile | anti-bot no formulário público | ⬜ novo |
+| Browser Rendering | automação de protocolo no tier "envio por você" (só órgãos sem login gov.br) | ⬜ fase 2.5 |
 | Cache API / CDN | página pública estática e rápida no Brasil inteiro | ✅ implícito |
 
 **Fora da Cloudflare (decisões pendentes):**
 - **PIX:** gateway com webhook (avaliar Mercado Pago vs. Asaas) — decisão antes da fase paga;
 - **E-mail:** Resend via REST (padrão da casa; sem chave = no-op com log);
-- **Sinergia prova-digital:** o comprovante de protocolo e a notificação podem ser
-  carimbados no Tinha Print (cross-sell natural; mesmo cofre R2, mesmo log append-only).
+- **Sinergia prova-digital:** comprovante de protocolo e notificação carimbados no
+  Tinha Print (cross-sell natural; mesmo cofre R2, mesmo log append-only).
 
 ---
 
@@ -138,13 +173,17 @@ casos        id, created_at, origem_entrada (form|foto|pdf), estado, motivo,
              aderiu_sne, orgao_autuador, codigo_infracao, valor, pontos
 pagamentos   id, caso_id, valor, status, provider, txid, created_at, refunded_at
 minutas      id, caso_id, tese, template_versao, r2_key_pdf, created_at
-orgaos       id, nome, uf, portal_url, docs_exigidos (json), formato, limite_mb
+orgaos       id, nome, uf, portal_url, docs_exigidos (json), formato, limite_mb,
+             aceita_envio_terceiro, exige_login_govbr
 infracoes    codigo, descricao, pontos, valor_base, orgao_competente
+protocolos   id, caso_id, orgao_id, modo (guiado|envio_por_voce), numero_protocolo,
+             r2_key_comprovante, created_at
 resultados   caso_id, desfecho (deferido|indeferido), fonte (usuario|garantia), created_at
 ```
 
 `resultados` é a tabela mais importante do produto: sem ela não sabemos se as teses
-funcionam e não podemos ligar a garantia.
+funcionam, não podemos ligar a garantia e **não temos prova social verdadeira para
+a tela de pagamento**. Ela alimenta o funil, a garantia e o fosso competitivo.
 
 ---
 
@@ -155,7 +194,8 @@ funcionam e não podemos ligar a garantia.
 **Novas métricas de produto:**
 - % de casos com indício de vício (se < 5%, o funil aperta demais — revisar teses);
 - conversão veredito → minuta paga (meta inicial: 8%);
-- taxa de deferimento reportada (alimenta a decisão da garantia);
+- conversão minuta → upgrade "envio por você" (meta inicial: 25% onde disponível);
+- taxa de deferimento reportada (alimenta garantia + prova social);
 - % que escolhe "pagar com desconto" por recomendação nossa (mede confiança, não fracasso).
 
 **Critério de morte revisado:** se em 90 dias a conversão paga < 3% OU a taxa de
@@ -170,8 +210,8 @@ ecossistema) e a camada paga morre.
 |---|---|---|
 | v1 (no ar) | formulário 3 datas, veredito, sem pagamento | — |
 | v1.5 | OCR assistido + PDF da CNH do Brasil + ramo SNE + matriz desconto/recurso | revisão legal das teses |
-| v2 | minuta paga (PIX) + guia por órgão (5 Detrans + PRF/DNIT) | funil das 10 conversas |
-| v2.5 | garantia invertida | 90 dias de dados de `resultados` |
+| v2 | minuta paga (PIX) + guia por órgão (5 Detrans + PRF/DNIT) + prova social legal | funil das 10 conversas |
+| v2.5 | garantia invertida + "envio por você" (órgãos flagados) | 90 dias de dados de `resultados` |
 | v3 | clube motorista profissional R$ 14,90/mês + lembretes + JARI | 100 minutas vendidas |
 
 ---
@@ -179,8 +219,12 @@ ecossistema) e a camada paga morre.
 ## 10. Riscos e honestidade
 
 - **OAB:** somos ferramenta e template, não advocacia. Disclaimer em toda saída.
+  O "envio por você" atua como mandatário documental (autorização assinada), não como
+  parecer jurídico — revisar enquadramento com advogado antes de ligar o tier.
 - **LGPD:** não pedimos placa, CPF nem foto de documento com dados sensíveis além do
   necessário à minuta; fotos em R2 privado; log append-only auditável.
+- **Prova social:** só número real da tabela `resultados`. No lançamento, a prova é a
+  lei. Inflar estatística destrói o fosso competitivo inteiro.
 - **Verdade na recomendação:** quando não houver tese, recomendamos pagar com desconto.
   É o que nos separa do despachante que vende recurso para tudo — e o que faz o usuário
   voltar na próxima multa.

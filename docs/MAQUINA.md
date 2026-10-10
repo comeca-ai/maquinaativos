@@ -38,6 +38,7 @@ Pedido registrado em `pedidos` (pendente). Você recebe por Pix fora da platafor
 | Esteira | `/api/ideias` | DB, CASO_WF | `ideias` | D1 |
 | Métricas | `/api/metricas` | DB | agregados | D1 (leitura) |
 | Captura de prova | `PUT /pub/<p>/captura` | PROVAS (R2), DB, CASO_WF | arquivo no cofre, `provas`, `acessos` | R2 (classe A) + D1 + 1 Workflow |
+| Relatório da prova | `POST /pub/<p>/provas/<id>/relatorio` (chave ou sessão), `GET /api/provas/<id>/relatorio` (equipe), e `RELATORIO.html` dentro do pacote | PROVAS, DB | lê manifesto, caso e `acessos`; grava 1 acesso `relatorio` | 1 leitura R2 (classe B) + D1 |
 | Link mágico | `/pub/conta/link`, `/entrar`, `/sair`, `/eu`, `/provas` | EMAIL (Email Service), DB | `contas` (só HMAC do e-mail), `links_login`, `sessoes` | 3.000 e-mails/mês incluídos no Workers Paid, depois US$ 0,35/1.000 |
 | Manutenção (cron `17 * * * *`) | — | DB, PROVAS, CASO_WF | âncoras OTS, reavaliação só com fato novo ou prazo vencido | CPU + steps de Workflow |
 Valores de preço da Cloudflare: confirmar na documentação oficial antes de decidir (não codificado aqui).
@@ -48,6 +49,12 @@ Para ligar o login: verificar o domínio no Email Service e trocar `LOGIN_EMAIL`
 Pendente: zona `pending` (nameservers no Registro.br); domínio no Email Service (os registros atuais SPF `-all`, DMARC `reject` e MX nulo bloqueiam e-mail); Cloudflare Access em `/studio` e `/api`; desligar workers.dev depois do domínio ativo; decidir Bucket Lock no R2 (custódia x LGPD).
 Atenção: o deploy pelo Git (merge na `main`) não aplica migrações. Aplique `pnpm db:remoto` ANTES do merge que depende de migração nova.
 Segredos do Worker: `API_TOKEN`, `SEGREDO_ORIGEM`, `SEGREDO_CONTA` (não rotacione o `SEGREDO_CONTA` sem migração: ele identifica as contas).
+
+## Relatório da prova (nível Lite, 10/10/2026)
+- Leitura humana de tudo o que o cofre tem sobre a prova: arquivo, hashes, hora do servidor (Brasília e UTC), manifesto literal, âncora OpenTimestamps, situação do caso, cadeia de custódia (acessos, com "mesma origem do envio", "outra origem", "sistema" ou "equipe", sem mostrar o código), dados pessoais guardados, como conferir e o que prova e não prova. A base legal da marca entra no fim.
+- **Sem ICP-Brasil**: o relatório diz que não tem assinatura digital nem carimbo de tempo ICP-Brasil. O kit RFC 3161 (`packages/kits/src/rfc3161.ts`) está pronto, mas NÃO está ligado no runtime; liga quando houver contrato com uma ACT.
+- HTML sem nenhum script (CSP `default-src 'none'`), tudo escapado, imprimível em A4 ("Salvar como PDF" no navegador).
+- Migração `0007` recria a tabela `acessos` para aceitar os tipos `relatorio` e `carimbo_tempo` (o SQLite não altera CHECK). Copia todas as linhas com os mesmos ids e datas e recria as travas append-only. Aplicar com `pnpm db:remoto` ANTES do deploy do código.
 
 ## Não confirmado
 - Fatos legais do produto Multa (CTB, JARI) seguem `NÃO CONFIRMADO` até haver fonte em `FONTES.md`.

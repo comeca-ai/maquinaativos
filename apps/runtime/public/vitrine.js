@@ -1,6 +1,6 @@
 // Vitrine de marca: landing de conversão, entrada por link mágico e "Minhas provas".
 // Genérica: todo texto de marca vem do produto (captura.marca). O framework só desenha e chama a API.
-import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, enviarComProgresso } from './base.js'
+import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio, enviarComProgresso } from './base.js'
 
 const app = document.getElementById('app')
 
@@ -92,7 +92,9 @@ function itemProva(nome, p, chave) {
     h('span', { class: 'v-meta' }, situacao),
     h('span', { class: 'v-meta mono', title: p.sha256 }, hashCurto(p.sha256)),
     p.vedado ? h('span', { class: 'v-meta erro' }, 'Indisponível para download.') :
-      h('div', { class: 'v-acoes' }, h('button', { type: 'button', class: 'v-botao tinta', onclick: () => baixarPacote(p.produto || nome, p.id, chave, msg) }, 'Baixar pacote (.zip)')),
+      h('div', { class: 'v-acoes' },
+        h('button', { type: 'button', class: 'v-botao tinta', onclick: () => baixarPacote(p.produto || nome, p.id, chave, msg) }, 'Baixar pacote (.zip)'),
+        h('button', { type: 'button', class: 'v-link', onclick: () => abrirRelatorio(p.produto || nome, p.id, chave) }, 'Ver relatório')),
     msg)
 }
 
@@ -200,6 +202,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
       caixaCodigo,
       h('div', { class: 'v-acoes' },
         h('button', { type: 'button', class: 'v-botao', onclick: () => baixarPacote(nome, r.id, r.naConta ? null : codigo, status) }, 'Baixar pacote (.zip)'),
+        h('button', { type: 'button', class: 'v-botao tinta', onclick: () => abrirRelatorio(nome, r.id, r.naConta ? null : codigo) }, 'Ver relatório'),
         h('button', { type: 'button', class: 'v-link', onclick: () => { ferramenta.replaceChildren(...original); aceite.checked = true; msg.textContent = '' } }, 'Guardar outro arquivo')),
       status,
       !r.naConta && conta.loginDisponivel ? formLink(nome, { titulo: 'Não quer depender do código?', texto: 'Receba um acesso no seu e-mail. Esta prova fica guardada na sua conta, e você baixa o pacote quando quiser. Não guardamos o seu e-mail, só uma marca cifrada dele.', vincular: { id: r.id, chave: codigo }, rotulo: 'Guardar na minha conta', turnstile: () => tokenTurnstile }) : null)

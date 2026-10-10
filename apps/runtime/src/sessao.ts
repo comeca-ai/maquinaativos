@@ -49,9 +49,15 @@ export async function hmacHex(chave: string, texto: string): Promise<string> {
 }
 
 /** Requisição que muda estado precisa vir da própria página (Origin igual ao host). Defesa extra além do SameSite=Lax. */
-export function mesmaOrigem(c: Context<{ Bindings: Env }>): boolean {
+/**
+ * O pedido veio da nossa própria página? Origin igual ao nosso, ou, quando o navegador manda Origin "null"
+ * (formulário que abre aba nova com Referrer-Policy: no-referrer), Sec-Fetch-Site = same-origin. Os dois
+ * cabeçalhos são proibidos para scripts: uma página de outro site não consegue forjá-los.
+ */
+export function mesmaOrigem(c: Pick<Context<{ Bindings: Env }>, 'req'>): boolean {
   const o = c.req.header('origin')
-  return Boolean(o) && o === new URL(c.req.url).origin
+  if (o && o !== 'null') return o === new URL(c.req.url).origin
+  return c.req.header('sec-fetch-site') === 'same-origin'
 }
 
 /** id da conta logada, ou null. */

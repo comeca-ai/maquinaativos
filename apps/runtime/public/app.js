@@ -1,5 +1,5 @@
 // Frontend genérico: não conhece nenhum produto. Renderiza o que a `tela` declarada manda.
-import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote } from './base.js'
+import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio } from './base.js'
 
 const app = document.getElementById('app')
 const TOPO_ORIGINAL = document.querySelector('.topo').innerHTML
@@ -250,8 +250,9 @@ function paginaCaptura(nome, cfg) {
       h('p', {}, h('strong', {}, 'Recebido em (relógio do servidor): '), r.recebidoEm),
       h('div', { class: 'acoes' },
         h('button', { onclick: () => baixarPacote(nome, r.id, r.codigoDeRecuperacao, m) }, 'Baixar pacote (.zip)'),
+        h('button', { class: 'sec', onclick: () => abrirRelatorio(nome, r.id, r.codigoDeRecuperacao) }, 'Ver relatório'),
         h('button', { class: 'sec', onclick: () => { const u = URL.createObjectURL(new Blob([`Identificador: ${r.id}\nCódigo de recuperação: ${r.codigoDeRecuperacao}\nSHA-256: ${r.sha256}\n`], { type: 'text/plain' })); const a = h('a', { href: u, download: `codigo-${r.id}.txt` }); document.body.append(a); a.click(); a.remove() } }, 'Salvar código (.txt)')),
-      m, h('p', { class: 'ajuda' }, 'O pacote traz o arquivo, o manifesto e a prova OpenTimestamps, verificáveis sem depender do nosso servidor.'))
+      m, h('p', { class: 'ajuda' }, 'O pacote traz o arquivo, o manifesto, a prova OpenTimestamps e o relatório, verificáveis sem depender do nosso servidor.'))
   }
 
   if (navigator.mediaDevices?.getDisplayMedia) {
@@ -318,7 +319,8 @@ function recuperarForm(nome) {
       h('p', {}, h('strong', {}, ROTULO_ESTADO[x.caso?.estado] || x.caso?.estado || 'Em andamento')),
       h('p', {}, `${x.nome} · ${x.bytes} bytes · carimbo: ${x.ancora}${x.otsAltura ? ' (bloco ' + x.otsAltura + ')' : ''}`),
       h('p', {}, h('span', { class: 'mono' }, x.sha256)),
-      h('button', { type: 'button', onclick: () => baixarPacote(nome, x.id, ch.value.trim(), msg) }, 'Baixar pacote (.zip)')))
+      h('button', { type: 'button', onclick: () => baixarPacote(nome, x.id, ch.value.trim(), msg) }, 'Baixar pacote (.zip)'),
+      h('button', { type: 'button', class: 'sec', onclick: () => abrirRelatorio(nome, x.id, ch.value.trim()) }, 'Ver relatório')))
   } }, h('h2', { class: 'sem-topo' }, 'Já guardei uma prova'), h('label', { for: 'rid' }, 'Identificador'), id, h('label', { for: 'rch' }, 'Código de recuperação'), ch, h('button', { type: 'submit', class: 'sec' }, 'Ver estado'), msg, saida)
   return f
 }

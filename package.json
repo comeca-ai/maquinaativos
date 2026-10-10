@@ -12,7 +12,8 @@
     "dev": "wrangler dev",
     "publicar": "node scripts/verificar-deploy.mjs && wrangler d1 migrations apply maquina --remote && wrangler deploy",
     "db:local": "wrangler d1 migrations apply maquina --local",
-    "db:remoto": "wrangler d1 migrations apply maquina --remote"
+    "db:remoto": "wrangler d1 migrations apply maquina --remote",
+    "cf": "node scripts/cf.mjs"
   },
   "dependencies": {
     "hono": "^4.13.13",

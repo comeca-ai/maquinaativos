@@ -25,11 +25,21 @@ pnpm dev                   # http://localhost:8787  (/ = público, /studio = int
 ## Publicar
 **Pelo painel da Cloudflare (recomendado):** Workers & Pages → Create → Import a repository → este repositório, branch `main`.
 - Nome do Worker: `maquinaativos`. Root directory: em branco.
-- Deploy command: `pnpm run publicar` (cria as tabelas e sobe o Worker). **Não use `pnpm deploy`**: é um comando interno do pnpm.
+- Deploy command: o padrão (`npx wrangler deploy`) já funciona. Para aplicar migrações novas junto, use `pnpm run publicar`. **Não use `pnpm deploy`**: é um comando interno do pnpm.
 - Antes: crie o banco D1 `maquina` e cole o `database_id` em `wrangler.jsonc`.
 - Depois: Settings → Variables & Secrets → secret `API_TOKEN`.
 
 **Pelo terminal:** `npx wrangler login`, `npx wrangler secret put API_TOKEN`, `pnpm run publicar`.
+
+## Kit Cloudflare (chamadas por API)
+`packages/kits/src/cloudflare.ts`: cliente tipado da API REST (verificar token, D1, R2, KV, Workers, Workers AI). É para ferramentas e agentes **antes de publicar**; o Worker em produção usa bindings.
+```bash
+export CLOUDFLARE_ACCOUNT_ID=...   # no ambiente, nunca no repositório
+export CLOUDFLARE_API_TOKEN=...
+pnpm cf verificar | d1:listar | r2:listar | kv:listar | workers:listar
+pnpm cf d1:sql maquina "SELECT count(*) FROM sinais"
+pnpm cf ai @cf/meta/llama-3.1-8b-instruct "texto"
+```
 
 ## Criar um produto
 Branch `produto/<nome>`, só dentro de `products/<nome>/`: `index.ts`, `rule.ts`, `casos.ts`, `NAO-FAREMOS.md`; depois `pnpm registro`. A CI recusa se faltar teste por estado e por motivo, ou se a branch tocar fora da pasta.

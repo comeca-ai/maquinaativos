@@ -20,3 +20,6 @@ Responda sempre em português. Não seja arrogante: explique o raciocínio e mar
 
 ## Fatos legais e de domínio
 Só entram em regra com fonte oficial citada (link) em `FONTES.md` do produto. Sem fonte: marque `NÃO CONFIRMADO` e não codifique como certeza.
+
+## Segredos
+Nunca grave token, chave ou senha no repositório, em `.md`, em teste ou em commit. Credenciais entram só por variável de ambiente ou `wrangler secret put`. Se uma credencial aparecer numa conversa, trate como exposta e peça a rotação.

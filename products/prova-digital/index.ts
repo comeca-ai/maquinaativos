@@ -89,12 +89,12 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
         { pergunta: 'E se eu perder o código?', resposta: 'Não conseguimos recuperar. Guardamos apenas o hash dele. Salve o código assim que aparecer.' },
         { pergunta: 'Funciona no celular?', resposta: 'Print e gravação da tela direto do navegador dependem do computador. No celular, envie o arquivo (o print que você já tirou). O carimbo é o mesmo, mas não conseguimos atestar como o arquivo foi gerado.' },
       ],
+      // Lançamento para testar mercado (decisão do dono, 10/10/2026): só o nível Lite, grátis. Caso e Escritório
+      // voltam quando houver login por e-mail ligado e pagamento. Preços planejados: OFERTA.md.
       planos: [
-        { nome: 'Avulso', preco: 'R$ 9,90', unidade: 'por prova', inclui: ['1 arquivo: print, vídeo ou PDF até 95 MB', 'Carimbo no Bitcoin, relatório para anexar e pacote .zip verificável', 'Cópia no cofre por 5 anos', 'A primeira é por nossa conta'] },
-        { nome: 'Caso', preco: 'R$ 39', unidade: 'até 30 provas', destaque: true, inclui: ['A conversa inteira: até 30 arquivos em 12 meses', 'Conta por e-mail, sem senha: Minhas provas', 'Baixe o pacote quando quiser, sem depender do código', 'Cópia no cofre por 5 anos'] },
-        { nome: 'Escritório', preco: 'R$ 149', unidade: 'por mês', inclui: ['Até 200 provas por mês', 'Conta por e-mail para organizar tudo', 'Cópia no cofre por 5 anos', 'Sem fidelidade: cancele quando quiser'] },
+        { nome: 'Lite', preco: 'Grátis', unidade: 'no lançamento', destaque: true, inclui: ['Print, gravação da tela ou arquivo até 95 MB', 'Cofre privado e carimbo da data no Bitcoin', 'Relatório para imprimir ou anexar', 'Pacote .zip que qualquer pessoa confere', 'Cópia no cofre por 5 anos', 'Sem certificação ICP-Brasil'] },
       ],
-      planosNota: 'Durante o teste, guardar é grátis (até 50 provas por dia). Os planos começam a valer quando o acesso por e-mail estiver ligado. Quem guardou antes não perde nada.',
+      planosNota: 'Estamos em lançamento: guardar é grátis, até 50 provas por dia. Se um dia passarmos a cobrar, quem guardou antes não perde o que guardou.',
       baseLegal: {
         intro: 'O que a lei diz, com o texto e o link oficial, e o que o carimbo prova. Sem exagero.',
         itens: [

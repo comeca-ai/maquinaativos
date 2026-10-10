@@ -9,7 +9,13 @@ Começamos **sem assinatura digital ICP-Brasil e sem carimbo de tempo ICP-Brasil
 - Por quê: ICP exige contrato com uma ACT e e-CNPJ, e ainda não temos nenhum dos dois. O kit RFC 3161 já está pronto no framework para quando houver contrato.
 - Relato do dono: o "Relatório Sites Lite" do concorrente (R$ 54) também sairia sem a autenticação ICP. **NÃO CONFIRMADO.** Na tela de compra de créditos (app.verifact.com.br/creditos/comprar, vista em 10/10/2026), o Lite aparece só com os limites: 15 min de navegação, 10 imagens, 5 MB de downloads e sem vídeo. Não achamos o texto sobre a autenticação. Até termos a fonte, não usar isso em comparação pública.
 
-## Os três planos (o que aparece na página)
+## Lançamento para testar mercado (decisão do dono, 10/10/2026)
+
+A página mostra **um plano só: Lite, grátis no lançamento** (até 50 provas por dia por origem). Caso e Escritório saíram da página porque dependem do login por e-mail (desligado) e de pagamento (não existe). Os preços abaixo continuam sendo o plano, não o que está no ar.
+- O que medir: Studio > Métricas (visita → consentiu → escolheu → guardou → baixou). Pergunta do teste: as pessoas guardam e voltam para baixar?
+- Próximo teste, se o dono quiser: mostrar um preço ("R$ 9,90 por prova depois do lançamento") para medir aceitação antes de cobrar. NÃO feito.
+
+## Os três planos (planejados; fora da página no lançamento)
 
 | Plano | Preço | O que inclui | Para quem |
 |---|---|---|---|

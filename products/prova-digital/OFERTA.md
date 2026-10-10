@@ -3,6 +3,12 @@
 Data: 2026-10-10. Preços são **decisão do dono** e mudam em um lugar só: `marca.planos` em `index.ts`.
 Nada aqui é fato legal; a base legal está em `FONTES.md`.
 
+## Decisão do dono (10/10/2026): começar no Lite
+
+Começamos **sem assinatura digital ICP-Brasil e sem carimbo de tempo ICP-Brasil**. Entregamos o arquivo no cofre, a âncora no Bitcoin (OpenTimestamps), o pacote .zip verificável e o **relatório da prova** (HTML para ver, imprimir ou salvar em PDF). O relatório e a página dizem que não há ICP-Brasil.
+- Por quê: ICP exige contrato com uma ACT e e-CNPJ, e ainda não temos nenhum dos dois. O kit RFC 3161 já está pronto no framework para quando houver contrato.
+- Relato do dono: o "Relatório Sites Lite" do concorrente (R$ 54) também sairia sem a autenticação ICP. **NÃO CONFIRMADO.** Na tela de compra de créditos (app.verifact.com.br/creditos/comprar, vista em 10/10/2026), o Lite aparece só com os limites: 15 min de navegação, 10 imagens, 5 MB de downloads e sem vídeo. Não achamos o texto sobre a autenticação. Até termos a fonte, não usar isso em comparação pública.
+
 ## Os três planos (o que aparece na página)
 
 | Plano | Preço | O que inclui | Para quem |
@@ -25,7 +31,7 @@ Referência de cartório: ata notarial em SP, primeira folha R$ 638,76 e página
 
 Leitura:
 1. **Onde ganhamos:** celular (o print já está lá), preço por arquivo (de 6 a 75 vezes menor por prova), guarda de 5 anos (contra 30 dias) e pacote que se confere sem nós.
-2. **Onde perdemos:** não temos ICP-Brasil, não temos relatório PDF assinado e não capturamos o site pelo servidor (o Verifact abre o site num navegador isolado, o que atesta a origem). Um print falso enviado como arquivo recebe o mesmo carimbo. Por isso **não** dizemos "equivale ao Verifact" nem "vale como prova".
+2. **Onde perdemos:** não temos ICP-Brasil, o nosso relatório não é assinado (é uma leitura dos registros do cofre) e não capturamos o site pelo servidor (o Verifact abre o site num navegador isolado, o que atesta a origem). Um print falso enviado como arquivo recebe o mesmo carimbo. Por isso **não** dizemos "equivale ao Verifact" nem "vale como prova".
 3. **Posição:** o primeiro passo barato e imediato, no celular, antes que apaguem. Quando o caso exigir fé pública ou captura atestada, a página manda para a ata notarial (e, no futuro, para o nosso plano com captura pelo servidor).
 
 ## Custo por prova (o que sustenta o preço)
@@ -47,7 +53,7 @@ Custo variável: **menos de R$ 0,50 por prova no pior caso** (vídeo de 95 MB po
 
 ## Roadmap que vira preço (não vendemos antes de existir)
 
-- Relatório PDF da prova (o que advogado anexa no processo).
+- ~~Relatório da prova~~: feito em 10/10/2026 (HTML imprimível, dentro do pacote e no botão "Ver relatório"). Falta a versão PDF assinada com e-CNPJ.
 - Carimbo ICP-Brasil por uma ACT credenciada (custo por carimbo NÃO CONFIRMADO; pedir cotação).
 - Captura do site pelo servidor (Cloudflare Browser Run: 10 horas/mês incluídas, depois US$ 0,09 por hora de navegador). Foi cortada da v1 pelo conselho; volta quando houver pagante.
 

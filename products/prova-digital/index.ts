@@ -80,7 +80,7 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
       passos: [
         { titulo: 'Capture', texto: 'Marque o consentimento e escolha: print da tela, gravação da tela ou um arquivo que você já tem.' },
         { titulo: 'Cofre', texto: 'Calculamos a impressão digital (SHA-256) no seu navegador e o servidor confere. O arquivo vai para um cofre privado, sem link público.' },
-        { titulo: 'Carimbo e pacote', texto: 'A impressão digital é registrada em calendários OpenTimestamps, que ancoram no Bitcoin (costuma levar algumas horas). Você recebe um código (mostrado uma única vez) e um pacote .zip que qualquer pessoa confere sem depender da gente.' },
+        { titulo: 'Carimbo e pacote', texto: 'A impressão digital é registrada em calendários OpenTimestamps, que ancoram no Bitcoin (costuma levar algumas horas). Você recebe um código (mostrado uma única vez), um relatório para imprimir ou anexar e um pacote .zip que qualquer pessoa confere sem depender da gente.' },
       ],
       perguntas: [
         { pergunta: 'Isso vale como prova na Justiça?', resposta: 'Não prometemos isso. O carimbo mostra que o arquivo existia nesta data e não mudou depois. Quem decide se serve como prova é o juiz, caso a caso. Para um fato importante, considere também uma ata notarial. A base legal, com o texto da lei, está mais abaixo.' },
@@ -90,7 +90,7 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
         { pergunta: 'Funciona no celular?', resposta: 'Print e gravação da tela direto do navegador dependem do computador. No celular, envie o arquivo (o print que você já tirou). O carimbo é o mesmo, mas não conseguimos atestar como o arquivo foi gerado.' },
       ],
       planos: [
-        { nome: 'Avulso', preco: 'R$ 9,90', unidade: 'por prova', inclui: ['1 arquivo: print, vídeo ou PDF até 95 MB', 'Carimbo no Bitcoin e pacote .zip verificável', 'Cópia no cofre por 5 anos', 'A primeira é por nossa conta'] },
+        { nome: 'Avulso', preco: 'R$ 9,90', unidade: 'por prova', inclui: ['1 arquivo: print, vídeo ou PDF até 95 MB', 'Carimbo no Bitcoin, relatório para anexar e pacote .zip verificável', 'Cópia no cofre por 5 anos', 'A primeira é por nossa conta'] },
         { nome: 'Caso', preco: 'R$ 39', unidade: 'até 30 provas', destaque: true, inclui: ['A conversa inteira: até 30 arquivos em 12 meses', 'Conta por e-mail, sem senha: Minhas provas', 'Baixe o pacote quando quiser, sem depender do código', 'Cópia no cofre por 5 anos'] },
         { nome: 'Escritório', preco: 'R$ 149', unidade: 'por mês', inclui: ['Até 200 provas por mês', 'Conta por e-mail para organizar tudo', 'Cópia no cofre por 5 anos', 'Sem fidelidade: cancele quando quiser'] },
       ],
@@ -109,6 +109,7 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
         'Não provamos que o conteúdo é verdadeiro, só que este arquivo existia e não mudou.',
         'Não substituímos ata notarial nem garantimos aceitação judicial.',
         'Não acessamos páginas por você: você mostra a tela ou envia o arquivo.',
+        'Sem certificação ICP-Brasil: o relatório não tem assinatura digital nem carimbo de tempo ICP-Brasil.',
         'Não aceitamos conteúdo íntimo, de menores ou que você não tem direito de guardar.',
       ],
     },

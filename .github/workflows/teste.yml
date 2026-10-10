@@ -1,0 +1,56 @@
+name: copia-de-teste
+# Publica a CÓPIA DE TESTE (Worker maquinaativos-teste: banco maquina-teste, cofre maquina-provas-teste).
+# Nada aqui toca produção. Roda a cada push na main e sob demanda (qualquer ramo: Actions > copia-de-teste > Run workflow).
+# Precisa dos segredos do repositório CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID. Sem eles, o job só avisa e termina.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ramo, tag ou commit para publicar na cópia de teste
+        required: false
+        default: main
+concurrency:
+  group: copia-de-teste
+  cancel-in-progress: false
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Sem credenciais, sem publicação
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: echo "::notice::Cadastre CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID em Settings > Secrets and variables > Actions para publicar a cópia de teste."
+      - uses: actions/checkout@v4
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        with: { ref: "${{ github.event.inputs.ref || github.sha }}" }
+      - uses: pnpm/action-setup@v4
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+      - uses: actions/setup-node@v4
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        with: { node-version: 22, cache: pnpm }
+      - name: Instalar
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: pnpm install --frozen-lockfile
+      - name: Verificar (registro, tipos, testes)
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: pnpm registro:check && pnpm typecheck && pnpm test
+      - name: Migrações no banco de TESTE
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx wrangler d1 migrations apply maquina-teste --remote --env teste
+      - name: Publicar a cópia de teste
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx wrangler deploy --env teste
+      - name: Segredos da cópia de teste (cria só os que faltam, com valor aleatório que ninguém precisa saber)
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: |
+          existentes=$(npx wrangler secret list --env teste 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s.slice(s.indexOf("["))).map(x=>x.name).join(" "))}catch{console.log("")}})')
+          for nome in SEGREDO_CONTA SEGREDO_ORIGEM; do
+            case " $existentes " in
+              *" $nome "*) echo "$nome já existe";;
+              *) openssl rand -hex 32 | npx wrangler secret put "$nome" --env teste > /dev/null && echo "$nome criado";;
+            esac
+          done

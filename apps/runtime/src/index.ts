@@ -12,7 +12,15 @@ export { CasoWorkflow } from './workflow'
 
 const app = new Hono<{ Bindings: Env }>()
 
-app.get('/saude', (c) => c.json({ ok: true, produtos: Object.keys(produtos) }))
+// Cópia de teste: nunca indexada por buscadores.
+app.use('*', async (c, next) => {
+  await next()
+  if (c.env.AMBIENTE !== 'teste') return
+  c.res = new Response(c.res.body, c.res)
+  c.res.headers.set('x-robots-tag', 'noindex, nofollow')
+})
+
+app.get('/saude', (c) => c.json({ ok: true, ambiente: c.env.AMBIENTE ?? 'producao', produtos: Object.keys(produtos) }))
 
 // Público: a experiência de cada produto, renderizada pelo framework a partir da `tela` declarada.
 app.route('/pub/conta', conta)
@@ -120,8 +128,14 @@ app.all('*', async (c) => {
   if (c.req.method !== 'GET' || !(r.headers.get('content-type') ?? '').includes('text/html')) return r
   const url = new URL(c.req.url)
   const p = produtoDaPagina(url, c.req.header('host') ?? '', c.env.DOMINIOS)
-  return p ? comMetaDaMarca(r, p, url) : r
+  const pagina = p ? comMetaDaMarca(r, p, url) : r
+  return c.env.AMBIENTE === 'teste' ? comFaixaDeTeste(pagina) : pagina
 })
+
+/** Faixa fixa no topo de toda página da cópia de teste, para ninguém confundir com o serviço de verdade. */
+const comFaixaDeTeste = (r: Response) => new HTMLRewriter().on('body', {
+  element(e) { e.prepend('<div class="faixa-teste" role="note">Cópia de TESTE. Nada aqui vale como prova, e os dados podem ser apagados.</div>', { html: true }) },
+}).transform(r)
 
 export default {
   fetch: app.fetch,

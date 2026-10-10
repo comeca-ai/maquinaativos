@@ -23,6 +23,8 @@ export interface Env {
   SEGREDO_CONTA?: string
   /** "ligado" para oferecer o login por e-mail. Desligado até o domínio do remetente estar verificado no Email Service. */
   LOGIN_EMAIL?: string
+  /** "teste" na cópia de teste (faixa no topo e noindex). Ausente em produção. */
+  AMBIENTE?: string
 }
 
 export type ParamsCaso = {

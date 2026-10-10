@@ -35,6 +35,32 @@
   "triggers": { "crons": ["17 * * * *"] },
   "workflows": [
     { "name": "maquina-caso", "binding": "CASO_WF", "class_name": "CasoWorkflow" }
-  ]
+  ],
   // Segredo de escrita: `wrangler secret put API_TOKEN` (local: `.dev.vars` na raiz).
+
+  // CÓPIA DE TESTE (v2): outro Worker, com banco, cofre e workflow PRÓPRIOS. Nada aqui toca os dados de produção.
+  // Tudo que está desligado em produção fica ligado aqui. Deploy: `.github/workflows/teste.yml` (ou `npx wrangler deploy --env teste`).
+  // Em env, vars/bindings/cron NÃO são herdados: repita tudo aqui.
+  "env": {
+    "teste": {
+      "name": "maquinaativos-teste",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": { "AMBIENTE": "teste", "TURNSTILE_SITEKEY": "", "EMAIL_REMETENTE": "Tinha Print (teste) <acesso@tinhaprint.com.br>", "LOGIN_EMAIL": "ligado", "DOMINIOS": "{}" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "maquina-teste",
+          "database_id": "7150dbe3-01fd-4784-9a04-0d1c1e379ea3",
+          "migrations_dir": "apps/runtime/migrations"
+        }
+      ],
+      "send_email": [{ "name": "EMAIL" }],
+      "r2_buckets": [{ "binding": "PROVAS", "bucket_name": "maquina-provas-teste" }],
+      "triggers": { "crons": ["17 * * * *"] },
+      "workflows": [
+        { "name": "maquina-caso-teste", "binding": "CASO_WF", "class_name": "CasoWorkflow" }
+      ]
+    }
+  }
 }

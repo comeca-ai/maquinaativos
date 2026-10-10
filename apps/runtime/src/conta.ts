@@ -69,7 +69,7 @@ conta.post('/link', async (c) => {
     .bind(await sha256Texto(token), eh, oh, produto, vincular, agora.toISOString(), new Date(agora.getTime() + LINK_MINUTOS * 60_000).toISOString()).run()
 
   const nome = (produto && produtos[produto]?.captura?.marca?.nome) || 'sua conta'
-  const m = mensagemDoLink(nome, `${new URL(c.req.url).origin}/entrar#t=${token}`, LINK_MINUTOS)
+  const m = mensagemDoLink(nome, `${new URL(c.req.url).origin}/entrar${produto ? `?p=${encodeURIComponent(produto)}` : ''}#t=${token}`, LINK_MINUTOS)
   try {
     await c.env.EMAIL.send({ from: remetente(c.env.EMAIL_REMETENTE), to: email, subject: m.assunto, text: m.texto, html: m.html })
   } catch (e) {

@@ -1,0 +1,2 @@
+Fontes hospedadas aqui (sem requisição a terceiros): Anton (display), IBM Plex Sans (texto), IBM Plex Mono (hashes e datas).
+Todas sob SIL Open Font License 1.1 (texto em LICENCA-OFL.txt). Origem: pacotes @fontsource 5.3.0, subconjunto latin.

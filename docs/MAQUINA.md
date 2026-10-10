@@ -37,7 +37,16 @@ Pedido registrado em `pedidos` (pendente). Você recebe por Pix fora da platafor
 | Caso durável | `/api/p/<p>/casos` | CASO_WF, DB | `casos`, `transicoes` | Workflows + D1 |
 | Esteira | `/api/ideias` | DB, CASO_WF | `ideias` | D1 |
 | Métricas | `/api/metricas` | DB | agregados | D1 (leitura) |
+| Captura de prova | `PUT /pub/<p>/captura` | PROVAS (R2), DB, CASO_WF | arquivo no cofre, `provas`, `acessos` | R2 (classe A) + D1 + 1 Workflow |
+| Link mágico | `/pub/conta/link`, `/entrar`, `/sair`, `/eu`, `/provas` | EMAIL (Email Service), DB | `contas` (só HMAC do e-mail), `links_login`, `sessoes` | 3.000 e-mails/mês incluídos no Workers Paid, depois US$ 0,35/1.000 |
+| Manutenção (cron `17 * * * *`) | — | DB, PROVAS, CASO_WF | âncoras OTS, reavaliação só com fato novo ou prazo vencido | CPU + steps de Workflow |
 Valores de preço da Cloudflare: confirmar na documentação oficial antes de decidir (não codificado aqui).
+
+## Revisão Cloudflare de 10/10/2026 (jhoneme)
+Feito: TLS mínimo 1.2 e HTTPS obrigatório na zona tinhaprint.com.br; limite de taxa (20 req/10 s por IP em PUT/POST `/pub/*`, só no domínio); cron sem Workflow por hora por prova; nome do arquivo fora da URL (logs); limite de upload 95 MiB (corpo máximo 100 MB na zona Free).
+Pendente: zona `pending` (nameservers no Registro.br); domínio no Email Service (os registros atuais SPF `-all`, DMARC `reject` e MX nulo bloqueiam e-mail); Cloudflare Access em `/studio` e `/api`; desligar workers.dev depois do domínio ativo; decidir Bucket Lock no R2 (custódia x LGPD).
+Atenção: o deploy pelo Git (merge na `main`) não aplica migrações. Aplique `pnpm db:remoto` ANTES do merge que depende de migração nova.
+Segredos do Worker: `API_TOKEN`, `SEGREDO_ORIGEM`, `SEGREDO_CONTA` (não rotacione o `SEGREDO_CONTA` sem migração: ele identifica as contas).
 
 ## Não confirmado
 - Fatos legais do produto Multa (CTB, JARI) seguem `NÃO CONFIRMADO` até haver fonte em `FONTES.md`.

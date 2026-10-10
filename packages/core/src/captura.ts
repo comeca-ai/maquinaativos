@@ -35,6 +35,10 @@ export interface MarcaCaptura {
   cenas?: readonly { titulo: string; texto: string }[]
   /** Texto do botão principal da landing. Padrão: 'Guardar uma prova agora'. */
   chamada?: string
+  /** Frase de fechamento da página, antes do último botão. */
+  fechamento?: string
+  /** Arquivo fictício do recibo de exemplo no topo da página (rotulado como exemplo). */
+  exemplo?: { arquivo: string; bytes: number }
   passos: readonly { titulo: string; texto: string }[]
   perguntas: readonly { pergunta: string; resposta: string }[]
   /** O que a ferramenta NÃO faz, dito de forma clara. */

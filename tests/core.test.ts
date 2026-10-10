@@ -97,3 +97,18 @@ describe('tela declarativa', () => {
     expect(montarEntrada(tela, { quando: '', flagrante: false }).quando).toBeUndefined()
   })
 })
+
+describe('prazoAte definido pelo produto', () => {
+  it('usa a data de fato em vez de hoje + prazoDias', async () => {
+    const { z } = await import('zod')
+    const { defineProduto, executar } = await import('@maquina/core')
+    const p = defineProduto({
+      nome: 'prazo-fato', versao: 'v1', entrada: z.object({ desde: z.string() }),
+      estados: { a: { final: false, prazoDias: 5 }, b: { final: true } }, estadoInicial: 'a',
+      motivos: { m_a: 'a', m_b: 'b' }, regra: (): { estado: 'a' | 'b'; motivo: 'm_a' | 'm_b' } => ({ estado: 'a', motivo: 'm_a' }),
+      prazoAte: (c) => c.desde, criterioDeMorte: { prazoDias: 1, metrica: 'x', minimo: 1 }, naoFaremos: ['x'],
+    })
+    const r = await executar(p, { desde: '2026-04-10' }, { hoje: '2026-04-01' })
+    expect(r.ok && r.transicao.prazoAte).toBe('2026-04-10')
+  })
+})

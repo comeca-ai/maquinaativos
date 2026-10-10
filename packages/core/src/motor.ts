@@ -45,6 +45,13 @@ export function validarEntrada(p: Produto, bruta: unknown): { ok: true; entrada:
   return { ok: false, detalhes: r.error.issues.map((i) => `${i.path.join('.') || '(raiz)'}: ${i.message}`) }
 }
 
+function prazoDoEstado(p: Produto, entrada: unknown, estado: string, prazoDias: number, ctx: Contexto): string {
+  if (!p.prazoAte) return somarDias(ctx.hoje, prazoDias)
+  const d = p.prazoAte(entrada, estado, ctx)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw new Error(`[${p.nome}] prazoAte devolveu data inválida: ${d}`)
+  return d
+}
+
 /**
  * Executa a regra pura e garante as invariantes da plataforma:
  * estado existe, motivo existe, motivo bate com o estado, estado não-final tem prazo.
@@ -72,7 +79,7 @@ export async function executar(p: Produto, bruta: unknown, ctx: Contexto, de?: s
       para: veredito.estado,
       motivo: veredito.motivo,
       final: def.final,
-      prazoAte: def.final ? null : somarDias(ctx.hoje, def.prazoDias),
+      prazoAte: def.final ? null : prazoDoEstado(p, v.entrada, veredito.estado, def.prazoDias, ctx),
       hashEntrada: await sha256(jsonEstavel(v.entrada)),
       hoje: ctx.hoje,
     },

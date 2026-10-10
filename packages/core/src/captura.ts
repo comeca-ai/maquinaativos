@@ -53,6 +53,17 @@ export interface MarcaCaptura {
   perguntas: readonly { pergunta: string; resposta: string }[]
   /** O que a ferramenta NÃO faz, dito de forma clara. */
   limites: readonly string[]
+  /**
+   * Seção "sua conta" (benefícios de entrar pelo e-mail). Só aparece quando o login por e-mail está LIGADO:
+   * com a chave desligada, a página não promete o que não funciona.
+   */
+  conta?: {
+    titulo: string
+    texto: string
+    beneficios: readonly { titulo: string; texto: string }[]
+    /** Texto do botão. Padrão: 'Entrar com meu e-mail'. */
+    chamada?: string
+  }
 }
 
 export interface Captura<In = unknown> {
@@ -92,6 +103,8 @@ export function validarCaptura(c: Captura): string[] {
       for (const i of m.baseLegal.itens) if (!/^https:\/\//.test(i.link) || !i.trecho || !i.leitura) e.push(`captura.marca.baseLegal: "${i.norma}" precisa de link https da fonte, trecho e leitura`)
     }
     if (m.planos?.some((p) => !p.nome || !p.preco || p.inclui.length === 0)) e.push('captura.marca.planos: nome, preço e o que inclui são obrigatórios')
+    if (m.conta && (!m.conta.titulo || !m.conta.texto || m.conta.beneficios.length === 0 || m.conta.beneficios.some((b) => !b.titulo || !b.texto)))
+      e.push('captura.marca.conta: título, texto e ao menos um benefício (com título e texto)')
   }
   return e
 }

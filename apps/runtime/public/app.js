@@ -12,7 +12,7 @@ const vitrine = () => import('./vitrine.js')
 const limpar = () => { app.replaceChildren() }
 
 /* ---------- roteador ---------- */
-function ir(caminho) { history.pushState({}, '', caminho); rotear() }
+function ir(caminho) { history.pushState({}, '', caminho); scrollTo(0, 0); rotear() }
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]')
   if (a && a.origin === location.origin) { e.preventDefault(); ir(a.pathname + a.search) }

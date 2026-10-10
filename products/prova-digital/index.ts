@@ -63,7 +63,30 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
   prazoAte: prazoDe,
   captura: {
     titulo: 'Preserve uma prova digital',
-    subtitulo: 'Tire um print, grave a tela ou envie um arquivo. Guardamos em cofre privado e carimbamos a data em blockchain.',
+    subtitulo: 'Tire o print, grave a tela ou envie o arquivo. Trancamos num cofre privado e carimbamos a data no Bitcoin.',
+    marca: {
+      nome: 'Tinha Print',
+      destaque: 'Print',
+      promessa: 'Guarde a prova antes que apaguem.',
+      passos: [
+        { titulo: 'Capture', texto: 'Marque o consentimento e escolha: print da tela, gravação da tela ou um arquivo que você já tem.' },
+        { titulo: 'Cofre', texto: 'Calculamos a impressão digital (SHA-256) no seu navegador e o servidor confere. O arquivo vai para um cofre privado, sem link público.' },
+        { titulo: 'Carimbo e pacote', texto: 'A impressão digital é registrada em calendários OpenTimestamps, que ancoram no Bitcoin em algumas horas. Você recebe um código (mostrado uma única vez) e um pacote .zip que qualquer pessoa confere sem depender da gente.' },
+      ],
+      perguntas: [
+        { pergunta: 'Isso vale como prova na Justiça?', resposta: 'Não prometemos isso. O carimbo mostra que o arquivo existia nesta data e não mudou depois. Quem decide se serve como prova é o juiz, caso a caso. Para um fato importante, considere também uma ata notarial.' },
+        { pergunta: 'Quem vê o meu arquivo?', resposta: 'Ninguém por link. Só quem tem o identificador e o código de recuperação baixa o pacote. A operação pode abrir um arquivo para tratar uma denúncia, e cada abertura fica registrada num log que não pode ser apagado.' },
+        { pergunta: 'Vocês guardam o meu IP?', resposta: 'Não. Guardamos só uma marca irreversível dele, para limitar abuso.' },
+        { pergunta: 'E se eu perder o código?', resposta: 'Não conseguimos recuperar. Guardamos apenas o hash dele. Salve o código assim que aparecer.' },
+        { pergunta: 'Funciona no celular?', resposta: 'Print e gravação da tela direto do navegador dependem do computador. No celular, envie o arquivo (o print que você já tirou). O carimbo é o mesmo, mas não conseguimos atestar como o arquivo foi gerado.' },
+      ],
+      limites: [
+        'Não provamos que o conteúdo é verdadeiro, só que este arquivo existia e não mudou.',
+        'Não substituímos ata notarial nem garantimos aceitação judicial.',
+        'Não acessamos páginas por você: você mostra a tela ou envia o arquivo.',
+        'Não aceitamos conteúdo íntimo, de menores ou que você não tem direito de guardar.',
+      ],
+    },
     aviso:
       'O carimbo (OpenTimestamps, ancorado no Bitcoin) mostra que este arquivo existia nesta data e não foi alterado desde então. Não prova que o conteúdo é verdadeiro, não garante que será aceito como prova (quem decide é o juiz) e não substitui ata notarial. Não capture conteúdo íntimo, de menores, nem o que você não tem direito de guardar.',
     tiposMime: ['image/', 'video/', 'application/pdf', 'text/plain'],

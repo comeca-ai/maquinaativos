@@ -158,7 +158,8 @@ body.vitrine .rodape p { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18p
 .v-base .v-limites h3 { font-size: 20px; margin: 0 0 12px; }
 .v-ressalva { margin: 24px 0 0; font-size: 15px; color: var(--tinta-2); max-width: 70ch; }
 .v-planos-grade { display: grid; gap: 16px; }
-@media (min-width: 900px) { .v-planos-grade { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .v-planos-grade { grid-template-columns: repeat(3, 1fr); } .v-planos-grade.unico { grid-template-columns: minmax(0, 560px); } }
+.v-plano .v-botao { margin-top: 8px; }
 .v-plano { border: 1.5px solid var(--linha); border-radius: var(--raio); padding: 22px; display: grid; gap: 10px; align-content: start; }
 .v-plano.destaque { border-color: var(--tinta); border-width: 2px; }
 .v-plano h3 { font: 400 28px/1 var(--display); text-transform: uppercase; margin: 0; }

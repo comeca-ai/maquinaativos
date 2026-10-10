@@ -219,6 +219,8 @@ async function baixarPacote(nome, id, chave, msg) {
 
 function marcaHero(m) {
   document.title = m.nome + ' — ' + m.promessa
+  const rodape = document.querySelector('.rodape p')
+  if (rodape) rodape.textContent = m.nome + ' preserva arquivos e carimba a data. Não é aconselhamento jurídico.'
   const topo = document.querySelector('.topo .marca')
   if (topo) {
     const base = m.destaque ? m.nome.slice(0, m.nome.length - m.destaque.length) : m.nome

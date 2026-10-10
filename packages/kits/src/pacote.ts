@@ -32,7 +32,7 @@ export async function verificarPacote(arquivos: { nome: string; dados: Uint8Arra
     try { m = JSON.parse(new TextDecoder().decode(man.dados)) } catch { marca(false, 'manifesto.json não é JSON válido') }
     if (m?.arquivo?.sha256) {
       const h = await sha(arq.dados)
-      marca(h === m.arquivo.sha256, `SHA-256 do arquivo ${h === m.arquivo.sha256 ? 'confere com' : 'DIFERE de'} o manifesto (${h})`)
+      marca(h === m.arquivo.sha256, `SHA-256 do arquivo ${h === m.arquivo.sha256 ? 'confere com o' : 'DIFERE do'} manifesto (${h})`)
       marca(arq.dados.length === m.arquivo.bytes, `tamanho ${arq.dados.length} bytes ${arq.dados.length === m.arquivo.bytes ? 'confere' : 'DIFERE do manifesto'}`)
     } else if (m) marca(false, 'manifesto sem arquivo.sha256')
   }

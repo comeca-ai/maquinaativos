@@ -2,8 +2,19 @@
 // Uso: node scripts/verificar-pacote.mjs <pasta-ou-arquivo.zip>
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { verificarPacote } from '../packages/kits/src/pacote.ts'
-import { lerZipStore } from '../packages/kits/src/zip.ts'
+import { register } from 'node:module'
+
+// O código do repositório importa sem extensão (como o bundler faz). Para rodar direto no Node, completamos '.ts'.
+register('data:text/javascript,' + encodeURIComponent(`
+export async function resolve(spec, ctx, next) {
+  try { return await next(spec, ctx) } catch (e) {
+    if (e.code === 'ERR_MODULE_NOT_FOUND' && spec.startsWith('.') && !/\\.[a-z]+$/.test(spec)) return next(spec + '.ts', ctx)
+    throw e
+  }
+}`), import.meta.url)
+
+const { verificarPacote } = await import('../packages/kits/src/pacote.ts')
+const { lerZipStore } = await import('../packages/kits/src/zip.ts')
 
 const alvo = process.argv[2]
 if (!alvo) { console.error('uso: node scripts/verificar-pacote.mjs <pasta-ou-arquivo.zip>'); process.exit(2) }

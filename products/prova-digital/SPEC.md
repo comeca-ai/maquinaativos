@@ -25,3 +25,8 @@ Karp, Musk e Altman cortariam também gravação de tela. O dono pediu print e g
 
 ## Dependência de framework
 Captura, cofre R2 e âncora são infraestrutura (branch `framework/captura`). Esta branch só tem a regra e os casos.
+
+## Achados do revisor (cego-primeiro) e decisão
+- Entradas contraditórias (ex.: âncora sem gravação) agora são recusadas na porta, com testes em `entrada.test.ts`.
+- Estado final é imutável: o runtime recusa reavaliar caso final sem `?reabrir=1`. A regra ainda dá precedência às recusas, o que fica documentado em `casos.ts`. O contador `capturasUltimas24h` é lido no momento da captura, nunca em reavaliação posterior.
+- **Aberto (precisa de mudança no core, branch `framework/captura`):** o `prazoAte` gravado no log é `data da avaliação + prazoDias`, mas a regra mede prazos a partir de datas de fato (`solicitadoEm`, `gravadoEm`, `ancoraEnviadaEm`). Até o core aceitar um `prazoAte` calculado pelo produto, o campo do log não deve ser usado como prazo oficial deste produto.

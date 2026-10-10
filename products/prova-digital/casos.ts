@@ -52,6 +52,11 @@ export const casos: CasoDeTeste[] = [
   { nome: 'volume acima do limite em 24h', entrada: { ...guardado, capturasUltimas24h: 51 }, ctx: d('2026-03-03'), espera: { estado: 'recusada', motivo: 'abuso_por_volume' } },
   { nome: 'exatamente no limite de volume ainda passa', entrada: { ...guardado, capturasUltimas24h: 50 }, ctx: d('2026-03-03'), espera: { estado: 'guardada', motivo: 'guardada_sem_ancora' } },
 
+  // fronteiras e combinações que faltavam
+  { nome: 'arquivo recebido, gravação incompleta, último dia do prazo ainda vale', entrada: { ...vazio, arquivoSha256: H }, ctx: d('2026-03-05'), espera: { estado: 'aguardando_captura', motivo: 'gravacao_pendente' } },
+  { nome: 'arquivo no cofre sem manifesto e prazo vencido', entrada: { ...guardado, manifestoGravado: false }, ctx: d('2026-03-06'), espera: { estado: 'falhou', motivo: 'gravacao_incompleta_vencida' } },
+  { nome: 'recusa posterior vence até uma prova já preservada (runtime não reavalia finais)', entrada: { ...guardado, ancora: 'confirmada', ancoraEnviadaEm: '2026-03-02', conteudoVedado: true }, ctx: d('2026-03-03'), espera: { estado: 'recusada', motivo: 'conteudo_vedado' } },
+
   // precedência
   { nome: 'recusa por consentimento vence hash divergente', entrada: { ...guardado, consentimento: false, hashConferido: false }, ctx: d('2026-03-03'), espera: { estado: 'recusada', motivo: 'sem_consentimento' } },
   { nome: 'hash divergente vence âncora confirmada', entrada: { ...guardado, hashConferido: false, ancora: 'confirmada', ancoraEnviadaEm: '2026-03-02' }, ctx: d('2026-03-03'), espera: { estado: 'falhou', motivo: 'hash_divergente' } },

@@ -9,10 +9,11 @@
     "registro": "node scripts/gerar-registro.mjs",
     "registro:check": "node scripts/gerar-registro.mjs --check",
     "cerca": "node scripts/cerca.mjs",
-    "dev": "wrangler dev -c apps/runtime/wrangler.jsonc",
-    "deploy": "wrangler deploy -c apps/runtime/wrangler.jsonc",
-    "db:local": "wrangler d1 migrations apply maquina --local -c apps/runtime/wrangler.jsonc",
-    "db:remoto": "wrangler d1 migrations apply maquina --remote -c apps/runtime/wrangler.jsonc"
+    "dev": "wrangler dev",
+    "publicar": "node scripts/verificar-deploy.mjs && wrangler d1 migrations apply maquina --remote && wrangler deploy",
+    "db:local": "wrangler d1 migrations apply maquina --local",
+    "db:remoto": "wrangler d1 migrations apply maquina --remote",
+    "cf": "node scripts/cf.mjs"
   },
   "dependencies": {
     "hono": "^4.13.13",

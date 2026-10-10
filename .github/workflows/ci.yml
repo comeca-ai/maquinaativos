@@ -23,4 +23,4 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node scripts/cerca.mjs "${{ github.head_ref }}" "origin/${{ github.base_ref }}"
       - name: Bundle do Worker compila
-        run: npx wrangler deploy --dry-run -c apps/runtime/wrangler.jsonc --outdir /tmp/wr
+        run: npx wrangler deploy --dry-run --outdir /tmp/wr

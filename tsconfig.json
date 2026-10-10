@@ -10,7 +10,8 @@
     "lib": ["ES2022"],
     "types": ["@cloudflare/workers-types", "vite/client", "node"],
     "paths": {
-      "@maquina/core": ["./packages/core/src/index.ts"]
+      "@maquina/core": ["./packages/core/src/index.ts"],
+      "@maquina/kits": ["./packages/kits/src/index.ts"]
     }
   },
   "include": ["packages", "apps", "products", "tests", "scripts/*.d.ts"]

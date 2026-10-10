@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { defineProduto } from '@maquina/core'
-import { regra, PRAZO_CAPTURA_DIAS, PRAZO_GUARDADA_DIAS, PRAZO_ANCORA_DIAS, type EntradaProva, type EstadoProva, type MotivoProva } from './rule'
+import { defineProduto, MAX_BYTES_CAPTURA } from '@maquina/core'
+import { regra, prazoDe, PRAZO_CAPTURA_DIAS, PRAZO_GUARDADA_DIAS, PRAZO_ANCORA_DIAS, type EntradaProva, type EstadoProva, type MotivoProva } from './rule'
 
 const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use AAAA-MM-DD')
 const sha256 = z.string().regex(/^[0-9a-f]{64}$/, 'SHA-256 em hexadecimal minúsculo (64 caracteres)')
@@ -60,6 +60,16 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
     abuso_por_volume: 'recusada',
   },
   regra,
+  prazoAte: prazoDe,
+  captura: {
+    titulo: 'Preserve uma prova digital',
+    subtitulo: 'Tire um print, grave a tela ou envie um arquivo. Guardamos em cofre privado e carimbamos a data em blockchain.',
+    aviso:
+      'O carimbo (OpenTimestamps, ancorado no Bitcoin) mostra que este arquivo existia nesta data e não foi alterado desde então. Não prova que o conteúdo é verdadeiro, não garante que será aceito como prova (quem decide é o juiz) e não substitui ata notarial. Não capture conteúdo íntimo, de menores, nem o que você não tem direito de guardar.',
+    tiposMime: ['image/', 'video/', 'application/pdf', 'text/plain'],
+    maxBytes: MAX_BYTES_CAPTURA,
+    montarEntrada: (f) => f,
+  },
   criterioDeMorte: { prazoDias: 14, metrica: 'conversas_reais', minimo: 10 },
   naoFaremos: [
     'Não afirma validade jurídica: a admissibilidade é decisão do juiz. Entrega integridade e data, não sentença.',

@@ -92,9 +92,21 @@ export const provaDigital = defineProduto<EstadoProva, MotivoProva, EntradaProva
       // Lançamento para testar mercado (decisão do dono, 10/10/2026): só o nível Lite, grátis. Caso e Escritório
       // voltam quando houver login por e-mail ligado e pagamento. Preços planejados: OFERTA.md.
       planos: [
-        { nome: 'Lite', preco: 'Grátis', unidade: 'no lançamento', destaque: true, inclui: ['Print, gravação da tela ou arquivo até 95 MB', 'Cofre privado e carimbo da data no Bitcoin', 'Relatório para imprimir ou anexar', 'Pacote .zip que qualquer pessoa confere', 'Cópia no cofre por 5 anos', 'Sem certificação ICP-Brasil'] },
+        { nome: 'Lite', preco: 'Grátis', unidade: 'no lançamento', destaque: true, inclui: ['Print, gravação da tela ou arquivo até 95 MB', 'Cofre privado e carimbo da data no Bitcoin', 'Relatório para imprimir ou anexar', 'Pacote .zip que qualquer pessoa confere', 'Cópia no cofre por 5 anos', 'Até 50 provas por dia'] },
       ],
-      planosNota: 'Estamos em lançamento: guardar é grátis, até 50 provas por dia. Se um dia passarmos a cobrar, quem guardou antes não perde o que guardou.',
+      planosNota: 'Sem certificação ICP-Brasil: o relatório não tem assinatura digital nem carimbo de tempo ICP-Brasil. Quando o caso pedir fé pública, o caminho é a ata notarial em cartório, levando o pacote junto. Se um dia passarmos a cobrar, quem guardou antes não perde o que guardou.',
+      // Só aparece com o login por e-mail LIGADO (o framework esconde a seção com a chave desligada).
+      conta: {
+        titulo: 'Sua conta, sem senha.',
+        texto: 'Guardar continua sem cadastro. A conta é para quem quer achar tudo depois, em qualquer aparelho.',
+        chamada: 'Entrar com meu e-mail',
+        beneficios: [
+          { titulo: 'Todas as provas num lugar só', texto: 'Minhas provas mostra o que você guardou, com o carimbo de cada uma, no celular ou no computador.' },
+          { titulo: 'Sem depender do código', texto: 'Perdeu o código de recuperação? Entrando pelo e-mail, o pacote e o relatório continuam com você.' },
+          { titulo: 'Nenhuma senha para vazar', texto: 'Você entra por um link que chega no seu e-mail. Ele vale 15 minutos e funciona uma vez só.' },
+          { titulo: 'Seu e-mail não fica guardado', texto: 'Guardamos só uma marca cifrada dele, para reconhecer você. Nem a nossa equipe consegue ler.' },
+        ],
+      },
       baseLegal: {
         intro: 'O que a lei diz, com o texto e o link oficial, e o que o carimbo prova. Sem exagero.',
         itens: [

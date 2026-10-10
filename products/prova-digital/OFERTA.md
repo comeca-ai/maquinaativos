@@ -15,6 +15,12 @@ A página mostra **um plano só: Lite, grátis no lançamento** (até 50 provas 
 - O que medir: Studio > Métricas (visita → consentiu → escolheu → guardou → baixou). Pergunta do teste: as pessoas guardam e voltam para baixar?
 - Próximo teste, se o dono quiser: mostrar um preço ("R$ 9,90 por prova depois do lançamento") para medir aceitação antes de cobrar. NÃO feito.
 
+## v2 das telas (10/10/2026)
+
+Desenho aprovado pelo dono e implementado no framework: conta sem senha (link mágico), link enviado com atalho para a caixa de entrada, Minhas provas, trazer prova antiga pelo código. A seção "Sua conta, sem senha" (`marca.conta`) só aparece com o login por e-mail ligado. Hoje ela fica escondida em produção e visível na cópia de teste.
+- A promessa "Seu e-mail não fica guardado" é fato do código: só o HMAC do e-mail vai para o banco (`apps/runtime/src/conta.ts`).
+- "Vale 15 minutos e funciona uma vez só" é fato do código (`LINK_MINUTOS`, `usado_em`).
+
 ## Os três planos (planejados; fora da página no lançamento)
 
 | Plano | Preço | O que inclui | Para quem |

@@ -39,6 +39,8 @@ Pedido registrado em `pedidos` (pendente). Você recebe por Pix fora da platafor
 | Métricas | `/api/metricas` | DB | agregados | D1 (leitura) |
 | Captura de prova | `PUT /pub/<p>/captura` | PROVAS (R2), DB, CASO_WF | arquivo no cofre, `provas`, `acessos` | R2 (classe A) + D1 + 1 Workflow |
 | Relatório da prova | `POST /pub/<p>/provas/<id>/relatorio` (chave ou sessão), `GET /api/provas/<id>/relatorio` (equipe), e `RELATORIO.html` dentro do pacote | PROVAS, DB | lê manifesto, caso e `acessos`; grava 1 acesso `relatorio` | 1 leitura R2 (classe B) + D1 |
+| Funil por origem | `POST /pub/<p>/evento` (com `origem`) e cabeçalho `x-funil-origem` no envio, no download e no login; `GET /api/funil` | DB | `contagem_origem`: contador por produto, dia, origem e etapa (sem cookie, sem pessoa; até 40 origens por dia, o resto vira "outro") | D1 (1 escrita a mais por evento) |
+| Quem voltou | `GET /api/retorno?dias=30` | DB | calculado de `provas` + `acessos` (nada novo é coletado) | D1 (leitura) |
 | Link mágico | `/pub/conta/link`, `/entrar`, `/sair`, `/eu`, `/provas` | EMAIL (Email Service), DB | `contas` (só HMAC do e-mail), `links_login`, `sessoes` | 3.000 e-mails/mês incluídos no Workers Paid, depois US$ 0,35/1.000 |
 | Manutenção (cron `17 * * * *`) | — | DB, PROVAS, CASO_WF | âncoras OTS, reavaliação só com fato novo ou prazo vencido | CPU + steps de Workflow |
 Valores de preço da Cloudflare: confirmar na documentação oficial antes de decidir (não codificado aqui).

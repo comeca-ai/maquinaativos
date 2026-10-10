@@ -1,6 +1,6 @@
 // Vitrine de marca: landing de conversão, entrada por link mágico e "Minhas provas".
 // Genérica: todo texto de marca vem do produto (captura.marca). O framework só desenha e chama a API.
-import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio, enviarComProgresso } from './base.js'
+import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio, enviarComProgresso, origemDaVisita, cabecalhoOrigem } from './base.js'
 
 const app = document.getElementById('app')
 
@@ -16,7 +16,7 @@ const linkInterno = (href, ...filhos) => h('a', { href, 'data-link': true }, ...
 function evento(nome, etapa, umaVezPorSessao = false) {
   const chave = `funil:${nome}:${etapa}`
   try { if (umaVezPorSessao && sessionStorage.getItem(chave)) return; if (umaVezPorSessao) sessionStorage.setItem(chave, '1') } catch { /* sem storage: conta mesmo assim */ }
-  const url = `/pub/${encodeURIComponent(nome)}/evento`, corpo = JSON.stringify({ etapa })
+  const url = `/pub/${encodeURIComponent(nome)}/evento`, corpo = JSON.stringify({ etapa, origem: origemDaVisita() })
   try { if (navigator.sendBeacon?.(url, new Blob([corpo], { type: 'application/json' }))) return } catch { /* cai no fetch */ }
   fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: corpo, keepalive: true }).catch(() => {})
 }
@@ -59,7 +59,7 @@ function formLink(nome, { titulo, texto, vincular, rotulo = 'Enviar link de aces
   const botao = h('button', { type: 'submit', class: 'v-botao tinta' }, rotulo)
   const form = h('form', { class: 'v-conta', onsubmit: async (e) => {
     e.preventDefault(); botao.disabled = true; msg.className = 'v-status'; msg.textContent = 'Enviando…'
-    const r = await post('/pub/conta/link', { email: email.value, produto: nome, vincular, turnstile: turnstile?.() })
+    const r = await post('/pub/conta/link', { email: email.value, produto: nome, vincular, turnstile: turnstile?.() }, cabecalhoOrigem())
     botao.disabled = false
     if (r.ok) { form.replaceChildren(h('h3', {}, 'Confira seu e-mail.'), h('p', {}, `Mandamos um link para ${email.value.trim()}. Ele vale ${r.j.minutos || 15} minutos e funciona uma vez só.`)); return }
     msg.className = 'v-status erro'
@@ -139,7 +139,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
       msg.textContent = 'Enviando para o cofre…'
       const q = new URLSearchParams({ sha256: sha, origem, consentimento: '1' })
       const r = await enviarComProgresso(`/pub/${encodeURIComponent(nome)}/captura?${q}`, blob, {
-        'content-type': blob.type || 'application/octet-stream', 'x-nome-arquivo': encodeURIComponent(nomeArquivo), ...(tokenTurnstile ? { 'x-turnstile': tokenTurnstile } : {}),
+        'content-type': blob.type || 'application/octet-stream', 'x-nome-arquivo': encodeURIComponent(nomeArquivo), ...cabecalhoOrigem(), ...(tokenTurnstile ? { 'x-turnstile': tokenTurnstile } : {}),
       }, (f) => { barra.style.width = `${Math.round(f * 100)}%`; msg.textContent = f < 1 ? `Enviando para o cofre… ${Math.round(f * 100)}%` : 'Registrando o carimbo…' })
       progresso.hidden = true
       if (!r.ok) {
@@ -310,7 +310,7 @@ export async function paginaEntrar(nome) {
     const msg = h('p', { class: 'v-status', role: 'status' })
     const botao = h('button', { type: 'button', class: 'v-botao', onclick: async () => {
       botao.disabled = true; msg.className = 'v-status'; msg.textContent = 'Entrando…'
-      const r = await post('/pub/conta/entrar', { token })
+      const r = await post('/pub/conta/entrar', { token }, cabecalhoOrigem())
       if (r.ok) { history.replaceState(null, '', `/minhas-provas${nome ? `?p=${encodeURIComponent(nome)}` : ''}`); return paginaMinhasProvas(nome, { vinculada: r.j.vinculada }) }
       botao.disabled = false
       msg.className = 'v-status erro'; msg.textContent = 'Este link venceu ou já foi usado. Peça outro abaixo.'

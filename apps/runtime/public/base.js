@@ -18,6 +18,23 @@ export function h(tag, attrs = {}, ...filhos) {
 export const get = async (url, opts) => { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); return { ok: r.ok, status: r.status, j } }
 export const post = (url, corpo, headers = {}) => get(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(corpo) })
 
+/**
+ * Origem da visita para o funil: utm_source do link ou o site de onde a pessoa veio (só o nome do site).
+ * Fica só nesta aba (sessionStorage), sem cookie e sem identificar ninguém. O servidor normaliza e agrega por dia.
+ */
+export function origemDaVisita() {
+  try { const salva = sessionStorage.getItem('funil:origem'); if (salva) return salva } catch { /* sem storage */ }
+  let o = 'direto'
+  try {
+    const utm = new URLSearchParams(location.search).get('utm_source')
+    if (utm) o = utm.slice(0, 40)
+    else if (document.referrer) { const host = new URL(document.referrer).hostname; if (host && host !== location.hostname) o = host }
+  } catch { /* referrer inválido: direto */ }
+  try { sessionStorage.setItem('funil:origem', o) } catch { /* sem storage */ }
+  return o
+}
+export const cabecalhoOrigem = () => ({ 'x-funil-origem': encodeURIComponent(origemDaVisita()) })
+
 export const hexDe = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('')
 export const sha256Hex = async (blob) => hexDe(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))
 
@@ -39,7 +56,7 @@ export const ROTULO_ESTADO = {
 /** Baixa o pacote .zip. Com `chave` usa o código de recuperação; sem ela, vale a sessão da conta dona da prova. */
 export async function baixarPacote(nome, id, chave, msg) {
   msg.className = ''; msg.textContent = 'Preparando o pacote…'
-  const r = await fetch(`/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id)}/pacote`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(chave ? { chave } : {}) })
+  const r = await fetch(`/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id)}/pacote`, { method: 'POST', headers: { 'content-type': 'application/json', ...cabecalhoOrigem() }, body: JSON.stringify(chave ? { chave } : {}) })
   if (!r.ok) { msg.className = 'erro'; msg.textContent = r.status === 404 ? 'Código ou identificador não confere.' : r.status === 451 ? 'Esta prova não está disponível.' : 'Não foi possível baixar agora.'; return }
   const url = URL.createObjectURL(await r.blob())
   const a = h('a', { href: url, download: `prova-${id}.zip` }); document.body.append(a); a.click(); a.remove()

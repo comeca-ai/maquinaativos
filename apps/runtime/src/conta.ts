@@ -7,7 +7,7 @@ import {
   COOKIE_SESSAO, LINK_MINUTOS, SESSAO_DIAS, contaDaSessao, cookieSessao, hmacHex, lerCookie, mesmaOrigem, normalizarEmail, remetente,
   tokenAleatorio, tokenValido,
 } from './sessao'
-import { contar } from './vitrine'
+import { contar, origemDoPedido } from './vitrine'
 import type { Env } from './env'
 
 /**
@@ -81,7 +81,7 @@ conta.post('/link', async (c) => {
     console.error('email_falhou', (e as { code?: string }).code ?? String(e))
     return c.json({ erro: 'email_falhou' }, 502)
   }
-  c.executionCtx.waitUntil(contar(c.env, produto, 'pediu_link'))
+  c.executionCtx.waitUntil(contar(c.env, produto, 'pediu_link', origemDoPedido(c)))
   return c.json({ ok: true, minutos: LINK_MINUTOS })
 })
 
@@ -108,7 +108,7 @@ conta.post('/entrar', async (c) => {
   await c.env.DB.prepare('INSERT INTO sessoes (token_hash, conta_id, criada_em, expira_em) VALUES (?, ?, ?, ?)')
     .bind(await sha256Texto(sessao), contaRow.id, agora, new Date(Date.now() + SESSAO_DIAS * 86400_000).toISOString()).run()
   c.header('set-cookie', cookieSessao(sessao, new URL(c.req.url).protocol === 'https:'))
-  c.executionCtx.waitUntil(contar(c.env, link.produto, 'entrou'))
+  c.executionCtx.waitUntil(contar(c.env, link.produto, 'entrou', origemDoPedido(c)))
   c.header('cache-control', 'no-store')
   return c.json({ ok: true, vinculada })
 })

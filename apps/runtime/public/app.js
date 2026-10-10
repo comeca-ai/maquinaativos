@@ -1,5 +1,8 @@
 // Frontend genérico: não conhece nenhum produto. Renderiza o que a `tela` declarada manda.
-import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio } from './base.js'
+import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio, origemDaVisita } from './base.js'
+
+// Fixa a origem da visita já na primeira página (antes de qualquer navegação interna mudar a URL).
+origemDaVisita()
 
 const app = document.getElementById('app')
 const TOPO_ORIGINAL = document.querySelector('.topo').innerHTML
@@ -402,17 +405,35 @@ async function metricasView() {
 }
 
 const ROTULO_ETAPA = { visita: 'visitas', consentiu: 'autorizaram', escolheu: 'escolheram arquivo', guardou: 'guardaram', baixou: 'baixaram pacote', pediu_link: 'pediram acesso', entrou: 'entraram' }
+const pct = (n, d) => (d ? `${Math.round((n / d) * 1000) / 10}%` : '-')
 async function funilView() {
-  const r = await api('/funil?dias=14'); if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar o funil.')
+  const [r, ret] = await Promise.all([api('/funil?dias=14'), api('/retorno?dias=30')])
+  if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar o funil.')
   const produtosComDado = Object.entries(r.j.porProduto)
   if (!produtosComDado.length) return h('div', {}, h('h2', {}, 'Funil da vitrine (14 dias)'), h('p', { class: 'vazio' }, 'Sem eventos ainda.'))
   return h('div', {}, h('h2', {}, `Funil da vitrine (desde ${r.j.desde})`),
     ...produtosComDado.map(([produto, c]) => {
       const base = c.visita || 0
-      return h('div', {}, h('h3', {}, produto), tabela([['etapa', 'etapa'], ['total', 'total'], ['pct', '% das visitas']],
-        r.j.etapas.map((e) => ({ etapa: ROTULO_ETAPA[e] || e, total: c[e] || 0, pct: base ? `${Math.round(((c[e] || 0) / base) * 1000) / 10}%` : '-' })), ['total', 'pct']))
+      const origens = Object.entries(r.j.porOrigem?.[produto] || {})
+        .map(([origem, e]) => ({ origem, visitas: e.visita || 0, guardaram: e.guardou || 0, baixaram: e.baixou || 0, conv: pct(e.guardou || 0, e.visita || 0) }))
+        .sort((x, y) => y.visitas - x.visitas || y.guardaram - x.guardaram)
+      const v = ret.ok ? ret.j.porProduto?.[produto] : null
+      return h('div', {}, h('h3', {}, produto),
+        tabela([['etapa', 'etapa'], ['total', 'total'], ['pct', '% das visitas']],
+          r.j.etapas.map((e) => ({ etapa: ROTULO_ETAPA[e] || e, total: c[e] || 0, pct: pct(c[e] || 0, base) })), ['total', 'pct']),
+        h('h4', {}, 'De onde vêm'),
+        origens.length ? tabela([['origem', 'origem'], ['visitas', 'visitas'], ['guardaram', 'guardaram'], ['baixaram', 'baixaram'], ['conv', 'guardaram / visitas']], origens, ['visitas', 'guardaram', 'baixaram', 'conv'])
+          : h('p', { class: 'vazio' }, 'Ainda sem origem registrada (começa a contar com esta versão).'),
+        h('h4', {}, `Quem voltou (provas desde ${ret.ok ? ret.j.desde : '-'})`),
+        v ? tabela([['m', 'medida'], ['n', 'total'], ['p', '%']], [
+          { m: 'provas guardadas', n: v.provas, p: '' },
+          { m: 'baixaram o pacote ou abriram o relatório', n: v.baixaram, p: pct(v.baixaram, v.provas) },
+          { m: 'voltaram depois de 24 h (entre as com mais de 1 dia)', n: v.voltaram, p: pct(v.voltaram, v.elegiveis) },
+          { m: 'guardadas numa conta', n: v.naConta, p: pct(v.naConta, v.provas) },
+          { m: 'contas com 2 provas ou mais', n: v.contasComDuasOuMais, p: pct(v.contasComDuasOuMais, v.contas) },
+        ], ['n', 'p']) : h('p', { class: 'vazio' }, 'Sem provas no período.'))
     }),
-    h('p', { class: 'ajuda' }, 'Contadores agregados por dia, sem dado pessoal. "Visitas" conta uma por aba do navegador; robôs podem inflar os números do topo.'))
+    h('p', { class: 'ajuda' }, 'Tudo é contagem agregada, sem dado pessoal e sem cookie. A origem é o utm_source do link ou o nome do site de onde a pessoa veio; "desconhecida" é quem guardou sem passar pela vitrine nesta versão. "Voltou" sai do log de acessos que já existia. Robôs podem inflar as visitas.'))
 }
 
 async function pedidosView() {

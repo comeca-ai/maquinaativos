@@ -88,3 +88,17 @@ button:disabled{opacity:.6;cursor:progress}
 .faq p{color:var(--suave);margin:8px 0 2px;font-size:15px}
 .limites{padding-left:1.2em;color:var(--suave);font-size:15px}
 .limites li{margin:4px 0}
+
+/* landing */
+.landing{max-width:860px}
+.heroi{padding:18px 0 8px}
+.heroi h1{font-size:clamp(34px,8vw,56px);line-height:1.06}
+.heroi .botao{font-size:18px;padding:15px 26px}
+.selo{color:var(--suave);font-size:14px;margin:14px 0 0}
+.cenas{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.cena{display:grid;gap:4px;padding:14px;border:1px solid var(--linha);border-radius:var(--raio);background:var(--cartao)}
+.cena strong{font-family:var(--serif);font-size:18px}
+.cena span{color:var(--suave);font-size:15px}
+.ferramenta{margin:34px 0 8px;padding:20px;border:1px solid var(--linha);border-radius:var(--raio);background:var(--cartao);scroll-margin-top:16px}
+.ferramenta .aviso{background:transparent}
+.recuperar{margin-top:36px;padding-top:6px;border-top:1px solid var(--linha)}

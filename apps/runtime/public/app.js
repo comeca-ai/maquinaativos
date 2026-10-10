@@ -227,7 +227,7 @@ function marcaHero(m) {
   }
 }
 
-function marcaDepois(m) {
+function marcaDepois(m, _landing) {
   return h('div', { class: 'marca-info' },
     h('h2', {}, 'Como funciona'),
     h('ol', { class: 'passos' }, m.passos.map((x) => h('li', {}, h('strong', {}, x.titulo), h('span', {}, x.texto)))),
@@ -324,9 +324,21 @@ function paginaCaptura(nome, cfg) {
   })
 
   const recuperar = recuperarForm(nome)
-  app.append(h('h1', {}, marca ? marca.promessa : cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso),
-    h('label', { class: 'consent', for: 'aceite-captura' }, aceite, 'Autorizo guardar este arquivo em cofre privado e enviar apenas o seu hash (uma impressão digital, nunca o conteúdo) a calendários públicos OpenTimestamps. Não guardamos o seu IP.'),
-    botoes, h('label', { for: 'arq' }, `Ou envie um arquivo (até ${maxMB} MB)`), arquivo, msg, saida, h('hr', { class: 'sep' }), recuperar, marca ? marcaDepois(marca) : null)
+  const consentimento = h('label', { class: 'consent', for: 'aceite-captura' }, aceite, 'Autorizo guardar este arquivo em cofre privado e enviar apenas o seu hash (uma impressão digital, nunca o conteúdo) a calendários públicos OpenTimestamps. Não guardamos o seu IP.')
+  const ferramenta = [consentimento, botoes, h('label', { for: 'arq' }, `Ou envie um arquivo (até ${maxMB} MB)`), arquivo, msg, saida]
+  if (!marca) {
+    app.append(h('h1', {}, cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso), ...ferramenta, h('hr', { class: 'sep' }), recuperar)
+  } else {
+    app.classList.add('landing')
+    app.append(
+      h('section', { class: 'heroi' }, h('h1', {}, marca.promessa), h('p', { class: 'sub' }, cfg.subtitulo),
+        h('a', { class: 'botao', href: '#capturar', onclick: (ev) => { ev.preventDefault(); document.getElementById('capturar').scrollIntoView({ behavior: 'smooth' }); aceite.focus({ preventScroll: true }) } }, marca.chamada || 'Guardar uma prova agora'),
+        h('p', { class: 'selo' }, 'Cofre privado · carimbo OpenTimestamps no Bitcoin · pacote verificável sem depender da gente')),
+      marca.cenas?.length ? h('section', {}, h('h2', {}, 'Quando você vai precisar'), h('div', { class: 'cenas' }, marca.cenas.map((x) => h('div', { class: 'cena' }, h('strong', {}, x.titulo), h('span', {}, x.texto))))) : null,
+      h('section', { id: 'capturar', class: 'ferramenta' }, h('h2', { class: 'sem-topo' }, 'Guarde agora'), h('p', { class: 'aviso' }, cfg.aviso), ...ferramenta),
+      marcaDepois(marca, true),
+      h('section', { class: 'recuperar' }, recuperar))
+  }
 
   if (cfg.turnstileSitekey) {
     const alvo = h('div'); app.insertBefore(alvo, botoes)

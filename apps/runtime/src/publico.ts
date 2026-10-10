@@ -71,3 +71,25 @@ publico.post('/:produto/interesse', async (c) => {
   ])
   return c.json({ ok: true })
 })
+
+// Preço declarado no contrato (público: a pessoa vê o que é grátis e o que é pago ANTES de qualquer pedido).
+publico.get('/:produto/preco', (c) => {
+  const p = produtos[c.req.param('produto')]
+  if (!p?.tela) return c.json({ erro: 'produto_nao_publico' }, 404)
+  return c.json({ preco: p.preco ?? null })
+})
+
+// Pedido manual (passo 1): só registra a intenção, com consentimento. O pagamento é combinado fora (Pix); Studio marca "pago".
+publico.post('/:produto/pedido', async (c) => {
+  const p = produtos[c.req.param('produto')]
+  if (!p?.tela) return c.json({ erro: 'produto_nao_publico' }, 404)
+  if (p.preco?.modelo !== 'por_caso' && p.preco?.modelo !== 'assinatura') return c.json({ erro: 'produto_sem_cobranca' }, 409)
+  const corpo = (await c.req.json().catch(() => null)) as { contato?: string; consentimento?: boolean; turnstile?: string } | null
+  if (!(await turnstileOk(c.env, corpo?.turnstile, c.req.header('cf-connecting-ip')))) return c.json({ erro: 'verificacao_falhou' }, 403)
+  const contato = (corpo?.contato ?? '').trim()
+  if (contato.length < 5 || contato.length > 200) return c.json({ erro: 'contato_invalido' }, 422)
+  if (corpo?.consentimento !== true) return c.json({ erro: 'sem_consentimento' }, 422)
+  await c.env.DB.prepare("INSERT INTO pedidos (id, produto, valor_centavos, status, contato, consentimento, criado_em) VALUES (?, ?, ?, 'pendente', ?, 1, ?)")
+    .bind(crypto.randomUUID(), p.nome, p.preco.centavos ?? 0, contato, new Date().toISOString()).run()
+  return c.json({ ok: true, valorCentavos: p.preco.centavos })
+})

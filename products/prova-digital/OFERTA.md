@@ -57,3 +57,25 @@ Custo variável: **menos de R$ 0,50 por prova no pior caso** (vídeo de 95 MB po
 - Bucket Lock no R2 (trava contra apagar): reforça custódia, mas impede a exclusão. Decidir junto.
 - Primeira prova grátis em cada plano: medir no funil (Studio > Métricas) se converte.
 - Comparação pública com o concorrente: não citar o nome na página. Comparação objetiva é possível, mas exige cuidado (CONAR); não feita.
+
+## O que o concorrente entrega de fato (pacote real, aberto em 2026-10-10)
+
+Arquivos de um registro do próprio dono (dados pessoais NÃO copiados para cá):
+- **Relatório PDF (13 págs.)**: capa com responsável (nome e CPF); introdução que cita ISO/IEC 27037, CPP art. 158-A, MP 2.200-2 e CPC arts. 369 e 411-II; selos "Assinatura certificada" (e-CNPJ, certificado PJ A3) e "Carimbo de tempo ICP-Brasil"; validador online com QR code; detalhes da sessão (início, fim, duração, fuso, IP de saída); cada imagem com nome, tamanho, SHA-512, SHA3-512, hora e URL de origem, e uma tarja com o ID e a hora sobre a imagem; vídeo MP4 (10 fps) com SHA-512; histórico de navegação; informações do domínio (IPs IPv4/IPv6); lista de metadados com hashes; texto de validação manual (validar.iti.gov.br). Formato PDF/A-3B, assinatura PAdES LT.
+- **ZIP de conteúdo**: PNGs, MP4, info.csv (hashes) e id.json.
+- **ZIP de metadados**: HTML renderizado de cada página visitada, log de requisições do navegador (URL, status, tamanho, SHA-256, IP remoto, cabeçalhos de resposta), histórico de navegação, DNS e SSL do domínio, RDAP, WHOIS e traceroute.
+- Ambiente: Firefox numa máquina isolada do Verifact; o usuário navega por ela. O registro fica 30 dias para download.
+
+## Entrega superior, dentro da lei (plano v2)
+
+| # | Entrega | Base | Depende do dono? |
+|---|---|---|---|
+| 1 | **Captura pelo servidor**: o usuário navega num navegador isolado da Cloudflare (Browser Run com Live View) e nós guardamos tela, vídeo/gravação da sessão, HTML renderizado, requisições, DNS, certificado TLS e RDAP. Funciona também a partir do celular (é um link). Fecha a maior fraqueza: a origem. | CPC art. 422 §1º (material para autenticação/perícia). NÃO CONFIRMADO: se a Live View pode ser usada por cliente final e embutida na página; precisa de protótipo. | Não |
+| 2 | **Dupla âncora**: além do Bitcoin (independe de qualquer empresa, inclusive de nós), carimbo de tempo **ICP-Brasil** de uma ACT credenciada no manifesto. | DOC-ICP-12 v1.3, itens 1.1.2 e 1.3.3: carimbos são emitidos por ACTs e pessoas jurídicas podem solicitar (https://www.gov.br/iti/pt-br/assuntos/legislacao/documentos-principais/doc-icp-12versao-1-3.pdf). Custo por carimbo: NÃO CONFIRMADO. | Sim: contrato com uma ACT |
+| 3 | **Relatório PDF/A assinado** com certificado ICP-Brasil da empresa (e-CNPJ), em linguagem que um juiz lê em 2 minutos, com QR para um verificador. | MP 2.200-2 art. 10 §1º (presunção sobre o signatário: atesta que FOMOS nós que geramos o relatório, não que o conteúdo é verdadeiro). | Sim: CNPJ da operação + e-CNPJ (em nuvem, para assinar no servidor) |
+| 4 | **Verificador público que roda no navegador**: a pessoa solta o .zip e confere tudo localmente (nada sobe para nós). Mais forte que um validador que depende do servidor do fornecedor. | Técnico. | Não |
+| 5 | **Guarda de 5 anos + cadeia de custódia visível**: o log append-only de acessos vira parte do relatório. Concorrente: 30 dias. | LGPD arts. 7º e 16 (guarda para exercício de direitos); tensão com art. 18 precisa de parecer. | Parecer jurídico |
+| 6 | **SHA-512 e SHA3-512** além do SHA-256 (paridade com o que perito espera ver). | Técnico. | Não |
+| 7 | Ponte para **ata notarial** quando o caso exigir fé pública (o pacote vai junto). | CPC art. 384 p.ú. (confirmado). Ata eletrônica a distância (Provimento CNJ 100/2020): NÃO CONFIRMADO em fonte oficial nesta data. | Parceria com cartório (sem captação de clientela) |
+
+O que NÃO fazer: dizer que "vale como prova" ou que "equivale a ICP" antes de ter ICP; citar o concorrente pelo nome na página; guardar CPF sem necessidade (só se o usuário pedir identificação no relatório, com consentimento); prometer aceitação em tribunal.

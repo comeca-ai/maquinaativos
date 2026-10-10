@@ -3,6 +3,7 @@ import { validarEntrada } from '@maquina/core'
 import { produtos } from './registro.gerado'
 import { publico, hojeBR } from './publico'
 import { esteira } from './esteira'
+import { capturaPublica, capturaInterna, manutencaoCaptura } from './captura'
 import type { Env } from './env'
 
 export { CasoWorkflow } from './workflow'
@@ -13,6 +14,7 @@ app.get('/saude', (c) => c.json({ ok: true, produtos: Object.keys(produtos) }))
 
 // Público: a experiência de cada produto, renderizada pelo framework a partir da `tela` declarada.
 app.route('/pub', publico)
+app.route('/pub', capturaPublica)
 
 // Interno: tudo em /api exige Bearer API_TOKEN (Studio). Cloudflare Access entra como 2ª camada.
 const api = new Hono<{ Bindings: Env }>()
@@ -103,10 +105,17 @@ api.get('/interesses', async (c) => {
 })
 
 api.route('/', esteira)
+api.route('/', capturaInterna)
 
 app.route('/api', api)
 
 // Todo o resto (/, /studio, /<produto>) é arquivo estático / SPA, servido pelo binding ASSETS.
 app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
 
-export default app
+export default {
+  fetch: app.fetch,
+  // Cron: ancora o que faltou, promove a Bitcoin o que já confirmou e reavalia casos abertos.
+  async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(manutencaoCaptura(env).then((r) => console.log('manutencao-captura', JSON.stringify(r))))
+  },
+} satisfies ExportedHandler<Env>

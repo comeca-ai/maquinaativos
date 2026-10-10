@@ -49,6 +49,8 @@ async function paginaInicial() {
 
 /* ---------- público: página de produto gerada da tela ---------- */
 async function paginaProduto(nome) {
+  const cap = await get(`/pub/${encodeURIComponent(nome)}/captura`)
+  if (cap.ok) return paginaCaptura(nome, cap.j)
   const { ok, j } = await get(`/pub/${encodeURIComponent(nome)}/tela`)
   if (!ok) return app.append(h('h1', {}, 'Não encontramos esta página'), h('p', {}, h('a', { href: '/', 'data-link': true }, 'Voltar ao início')))
   const t = j.tela
@@ -135,7 +137,7 @@ function studio() {
   app.classList.add('studio')
   if (!tokenGuardado()) return entrarNoStudio()
   const corpo = h('div'); let aba = 'esteira'
-  const nomes = { esteira: 'Esteira', metricas: 'Métricas', pedidos: 'Pedidos', sinais: 'Sinais do funil', produtos: 'Produtos', vencidos: 'Casos vencidos', interessados: 'Interessados' }
+  const nomes = { esteira: 'Esteira', provas: 'Provas', metricas: 'Métricas', pedidos: 'Pedidos', sinais: 'Sinais do funil', produtos: 'Produtos', vencidos: 'Casos vencidos', interessados: 'Interessados' }
   const abas = h('div', { class: 'abas', role: 'group', 'aria-label': 'Seções' })
   const desenhar = async () => {
     abas.replaceChildren(...Object.entries(nomes).map(([k, v]) => h('button', { class: 'sec', 'aria-pressed': String(k === aba), onclick: () => { aba = k; desenhar() } }, v)),
@@ -166,6 +168,7 @@ function tabela(colunas, linhas, numericas = []) {
 
 async function secao(aba) {
   if (aba === 'esteira') return esteiraView()
+  if (aba === 'provas') return provasView()
   if (aba === 'metricas') return metricasView()
   if (aba === 'pedidos') return pedidosView()
   if (aba === 'sinais') {
@@ -193,6 +196,136 @@ async function secao(aba) {
   }
   const i = await api('/interesses'); if (!i.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
   return tabela([['em', 'quando'], ['produto', 'produto'], ['motivo', 'motivo'], ['contato', 'contato']], i.j.interesses)
+}
+
+/* ---------- público: captura de evidência (print, gravação, arquivo) ---------- */
+const hexDe = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('')
+const sha256Hex = async (blob) => hexDe(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))
+const ROTULO_RECUSA = { sem_consentimento: 'Sem o consentimento nada é guardado.', conteudo_vedado: 'Este tipo de conteúdo não pode ser preservado aqui.', abuso_por_volume: 'Muitas capturas em 24 horas. Tente novamente amanhã.' }
+const ROTULO_ESTADO = { aguardando_captura: 'Aguardando', guardada: 'Guardada no cofre', ancorando: 'Carimbo enviado, aguardando o Bitcoin', preservada: 'Preservada e ancorada', preservada_sem_ancora: 'Preservada (carimbo não confirmado no prazo)', falhou: 'Falhou', recusada: 'Recusada' }
+
+async function baixarPacote(nome, id, chave, msg) {
+  msg.className = ''; msg.textContent = 'Preparando o pacote…'
+  const r = await fetch(`/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id)}/pacote`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave }) })
+  if (!r.ok) { msg.className = 'erro'; msg.textContent = r.status === 404 ? 'Código ou identificador não confere.' : 'Não foi possível baixar agora.'; return }
+  const url = URL.createObjectURL(await r.blob())
+  const a = h('a', { href: url, download: `prova-${id}.zip` }); document.body.append(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 15000); msg.textContent = 'Pacote baixado.'
+}
+
+function paginaCaptura(nome, cfg) {
+  document.title = cfg.titulo
+  let tokenTurnstile = null
+  const maxMB = Math.round(cfg.maxBytes / 1048576)
+  const aceite = h('input', { type: 'checkbox', id: 'aceite-captura' })
+  const msg = h('p', { class: 'erro', role: 'alert' })
+  const saida = h('div')
+  const botoes = h('div', { class: 'acoes' })
+  const consentido = () => { if (!aceite.checked) { msg.className = 'erro'; msg.textContent = 'Marque o consentimento para continuar.'; return false } msg.textContent = ''; return true }
+
+  async function preservar(blob, nomeArquivo, origem) {
+    botoes.querySelectorAll('button').forEach((b) => { b.disabled = true })
+    msg.className = ''; msg.textContent = 'Calculando a impressão digital (SHA-256) no seu navegador…'
+    try {
+      const sha = await sha256Hex(blob)
+      msg.textContent = 'Enviando para o cofre…'
+      const q = new URLSearchParams({ nome: nomeArquivo, sha256: sha, origem, consentimento: '1' })
+      const r = await get(`/pub/${encodeURIComponent(nome)}/captura?${q}`, { method: 'PUT', headers: { 'content-type': blob.type || 'application/octet-stream', ...(tokenTurnstile ? { 'x-turnstile': tokenTurnstile } : {}) }, body: blob })
+      if (!r.ok) {
+        msg.className = 'erro'
+        msg.textContent = r.j.recusada ? (ROTULO_RECUSA[r.j.motivo] || 'Recusada.') : r.status === 413 ? `Arquivo maior que ${maxMB} MB.` : r.status === 415 ? 'Tipo de arquivo não aceito.' : r.status === 429 ? 'Muitas tentativas. Tente mais tarde.' : r.j.erro === 'hash_divergente' ? 'O arquivo mudou durante o envio. Nada foi guardado. Tente de novo.' : 'Não foi possível preservar agora.'
+        return
+      }
+      msg.textContent = ''
+      saida.replaceChildren(cartaoResultado(r.j))
+      saida.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch { msg.className = 'erro'; msg.textContent = 'Falha de conexão. Nada foi guardado.' }
+    finally { botoes.querySelectorAll('button').forEach((b) => { b.disabled = false }) }
+  }
+
+  function cartaoResultado(r) {
+    const m = h('p', { role: 'status' })
+    return h('section', { class: 'cartao resultado ok' },
+      h('h2', {}, 'Prova guardada'),
+      h('p', {}, ROTULO_ESTADO[r.estado] || r.estado),
+      h('p', {}, h('strong', {}, 'Guarde este código agora. Ele não será mostrado de novo e não podemos recuperá-lo:')),
+      h('p', { class: 'codigo' }, r.codigoDeRecuperacao),
+      h('p', {}, h('strong', {}, 'Identificador: '), h('span', { class: 'mono' }, r.id)),
+      h('p', {}, h('strong', {}, 'SHA-256: '), h('span', { class: 'mono' }, r.sha256)),
+      h('p', {}, h('strong', {}, 'Recebido em (relógio do servidor): '), r.recebidoEm),
+      h('div', { class: 'acoes' },
+        h('button', { onclick: () => baixarPacote(nome, r.id, r.codigoDeRecuperacao, m) }, 'Baixar pacote (.zip)'),
+        h('button', { class: 'sec', onclick: () => { const u = URL.createObjectURL(new Blob([`Identificador: ${r.id}\nCódigo de recuperação: ${r.codigoDeRecuperacao}\nSHA-256: ${r.sha256}\n`], { type: 'text/plain' })); const a = h('a', { href: u, download: `codigo-${r.id}.txt` }); document.body.append(a); a.click(); a.remove() } }, 'Salvar código (.txt)')),
+      m, h('p', { class: 'ajuda' }, 'O pacote traz o arquivo, o manifesto e a prova OpenTimestamps, verificáveis sem depender do nosso servidor.'))
+  }
+
+  if (navigator.mediaDevices?.getDisplayMedia) {
+    botoes.append(h('button', { onclick: async () => {
+      if (!consentido()) return
+      let stream
+      try { stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }) } catch { msg.className = 'erro'; msg.textContent = 'Captura de tela cancelada ou não permitida.'; return }
+      const v = h('video', { muted: true, playsinline: true }); v.srcObject = stream
+      await v.play(); await new Promise((r) => setTimeout(r, 350))
+      const c = h('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0)
+      stream.getTracks().forEach((t) => t.stop())
+      const blob = await new Promise((r) => c.toBlob(r, 'image/png'))
+      if (blob) preservar(blob, `print-${new Date().toISOString().replace(/[:.]/g, '-')}.png`, 'navegador')
+    } }, 'Tirar print da tela'))
+
+    botoes.append(h('button', { onclick: async (e) => {
+      if (!consentido()) return
+      let stream
+      try { stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }) } catch { msg.className = 'erro'; msg.textContent = 'Gravação cancelada ou não permitida.'; return }
+      const tipo = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm'
+      const rec = new MediaRecorder(stream, { mimeType: tipo }); const partes = []; let total = 0
+      const parar = h('button', { class: 'sec' }, 'Parar e preservar')
+      const finalizar = () => { if (rec.state !== 'inactive') rec.stop() }
+      rec.ondataavailable = (ev) => { if (ev.data.size) { partes.push(ev.data); total += ev.data.size; if (total > cfg.maxBytes * 0.95) { msg.textContent = `Limite de ${maxMB} MB atingido; encerrando.`; finalizar() } } }
+      rec.onstop = () => { stream.getTracks().forEach((t) => t.stop()); parar.remove(); e.target.disabled = false; preservar(new Blob(partes, { type: 'video/webm' }), `gravacao-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`, 'navegador') }
+      stream.getVideoTracks()[0].addEventListener('ended', finalizar)
+      parar.onclick = finalizar; botoes.append(parar); e.target.disabled = true
+      msg.className = ''; msg.textContent = 'Gravando… use "Parar e preservar" ou encerre o compartilhamento.'
+      rec.start(1000)
+    } }, 'Gravar a tela'))
+  }
+
+  const arquivo = h('input', { type: 'file', id: 'arq', accept: cfg.tiposMime.map((t) => (t.endsWith('/') ? t + '*' : t)).join(',') })
+  arquivo.addEventListener('change', () => {
+    const f = arquivo.files[0]; if (!f) return
+    if (!consentido()) { arquivo.value = ''; return }
+    if (f.size > cfg.maxBytes) { msg.className = 'erro'; msg.textContent = `Arquivo maior que ${maxMB} MB.`; arquivo.value = ''; return }
+    preservar(f, f.name, 'arquivo_enviado'); arquivo.value = ''
+  })
+
+  const recuperar = recuperarForm(nome)
+  app.append(h('h1', {}, cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso),
+    h('label', { class: 'consent', for: 'aceite-captura' }, aceite, 'Autorizo guardar este arquivo em cofre privado e enviar apenas o seu hash (uma impressão digital, nunca o conteúdo) a calendários públicos OpenTimestamps. Não guardamos o seu IP.'),
+    botoes, h('label', { for: 'arq' }, `Ou envie um arquivo (até ${maxMB} MB)`), arquivo, msg, saida, h('hr', { class: 'sep' }), recuperar)
+
+  if (cfg.turnstileSitekey) {
+    const alvo = h('div'); app.insertBefore(alvo, botoes)
+    const sc = h('script', { src: 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit', async: true })
+    sc.onload = () => window.turnstile.render(alvo, { sitekey: cfg.turnstileSitekey, callback: (tk) => { tokenTurnstile = tk } })
+    document.head.append(sc)
+  }
+}
+
+function recuperarForm(nome) {
+  const id = h('input', { type: 'text', id: 'rid', autocomplete: 'off', maxlength: 64 })
+  const ch = h('input', { type: 'password', id: 'rch', autocomplete: 'off', maxlength: 128 })
+  const msg = h('p', { role: 'status' }); const saida = h('div')
+  const f = h('form', { onsubmit: async (e) => {
+    e.preventDefault(); saida.replaceChildren(); msg.className = ''; msg.textContent = ''
+    const r = await post(`/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id.value.trim())}/estado`, { chave: ch.value.trim() })
+    if (!r.ok) { msg.className = 'erro'; msg.textContent = 'Identificador ou código não confere.'; return }
+    const x = r.j
+    saida.replaceChildren(h('section', { class: 'cartao' },
+      h('p', {}, h('strong', {}, ROTULO_ESTADO[x.caso?.estado] || x.caso?.estado || 'Em andamento')),
+      h('p', {}, `${x.nome} · ${x.bytes} bytes · carimbo: ${x.ancora}${x.otsAltura ? ' (bloco ' + x.otsAltura + ')' : ''}`),
+      h('p', {}, h('span', { class: 'mono' }, x.sha256)),
+      h('button', { type: 'button', onclick: () => baixarPacote(nome, x.id, ch.value.trim(), msg) }, 'Baixar pacote (.zip)')))
+  } }, h('h2', { class: 'sem-topo' }, 'Já guardei uma prova'), h('label', { for: 'rid' }, 'Identificador'), id, h('label', { for: 'rch' }, 'Código de recuperação'), ch, h('button', { type: 'submit', class: 'sec' }, 'Ver estado'), msg, saida)
+  return f
 }
 
 /* ---------- Studio: preço, esteira, pedidos, métricas ---------- */
@@ -279,6 +412,20 @@ async function pedidosView() {
     h('thead', {}, h('tr', {}, ['quando', 'produto', 'valor', 'contato', 'status', ''].map((t) => h('th', {}, t)))),
     h('tbody', {}, r.j.pedidos.map((p) => h('tr', {}, h('td', {}, p.criado_em.slice(0, 10)), h('td', {}, p.produto), h('td', { class: 'num' }, reais(p.valor_centavos)), h('td', {}, p.contato), h('td', {}, p.status),
       h('td', {}, p.status === 'pendente' ? [h('button', { class: 'sec', onclick: act(p.id, 'pago') }, 'Marcar pago'), ' ', h('button', { class: 'sec', onclick: act(p.id, 'cancelar') }, 'Cancelar')] : '')))))))
+  return raiz
+}
+
+async function provasView() {
+  const r = await api('/provas'); if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar.')
+  const raiz = h('div')
+  const vedar = (id) => async () => { await mudar(`/provas/${id}/vedar`, 'POST'); raiz.replaceChildren(await provasView()) }
+  if (!r.j.provas.length) return h('p', { class: 'vazio' }, 'Nenhuma prova guardada ainda.')
+  raiz.append(h('div', { class: 'rolagem' }, h('table', { class: 'tabela' },
+    h('thead', {}, h('tr', {}, ['quando', 'produto', 'arquivo', 'estado', 'carimbo', 'downloads', ''].map((t) => h('th', {}, t)))),
+    h('tbody', {}, r.j.provas.map((p) => h('tr', {}, h('td', {}, p.gravado_em.slice(0, 16).replace('T', ' ')), h('td', {}, p.produto), h('td', {}, `${p.nome_arquivo} (${p.origem === 'navegador' ? 'captura' : 'enviado'})`),
+      h('td', {}, p.vedado ? 'vedada' : (p.motivo || p.estado || '-')), h('td', {}, p.ancora + (p.ots_altura ? ' · bloco ' + p.ots_altura : '')), h('td', { class: 'num' }, p.downloads),
+      h('td', {}, p.vedado ? '' : h('button', { class: 'sec', onclick: vedar(p.id) }, 'Vedar'))))))),
+    h('p', { class: 'ajuda' }, 'Vedar bloqueia o download e fica registrado no log imutável. A equipe só lê arquivos com registro de acesso.'))
   return raiz
 }
 

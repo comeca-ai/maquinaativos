@@ -18,6 +18,7 @@ body.vitrine {
   --carimbo: oklch(0.54 0.19 29);
   --carimbo-forte: oklch(0.48 0.19 29);
   --sobre-carimbo: oklch(0.985 0.006 85);
+  --cartao: oklch(0.985 0.006 85);
   --ok: oklch(0.47 0.09 150);
   --display: "Anton", "Arial Narrow", Impact, sans-serif;
   --texto: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -41,6 +42,7 @@ body.vitrine {
     --carimbo: oklch(0.66 0.19 31);
     --carimbo-forte: oklch(0.72 0.17 33);
     --sobre-carimbo: oklch(0.16 0.006 60);
+    --cartao: oklch(0.205 0.007 60);
     --ok: oklch(0.74 0.12 150);
   }
 }
@@ -64,15 +66,18 @@ body.vitrine .rodape { border-top: 1.5px solid var(--tinta); color: var(--tinta-
 body.vitrine .rodape p { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; }
 
 /* herói */
-.v-heroi { display: grid; gap: 40px; padding: 40px 0 var(--secao); }
-@media (min-width: 900px) { .v-heroi { grid-template-columns: 7fr 5fr; gap: 64px; align-items: start; padding-top: 72px; } }
+.v-heroi { display: grid; gap: 36px; padding: 40px 0 var(--secao); }
+@media (min-width: 900px) { .v-heroi { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 56px; align-items: start; padding-top: 72px; } }
+.v-heroi-acao { display: grid; gap: 0; align-content: start; }
+.v-provas-linha { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; font: 400 14px/1.4 var(--mono); color: var(--tinta-2); }
 .v-sobre { font: 500 12px/1.2 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--tinta-2); margin: 0 0 18px; }
-.v-manchete { font: 400 clamp(48px, 10vw, 96px)/0.94 var(--display); letter-spacing: -0.005em; text-transform: uppercase; margin: 0 0 22px; text-wrap: balance; }
-.v-sub { font-size: 20px; line-height: 1.45; color: var(--tinta-2); margin: 0 0 32px; max-width: 34ch; }
+.v-manchete { font: 400 clamp(52px, 9.5vw, 104px)/0.92 var(--display); letter-spacing: -0.005em; text-transform: uppercase; margin: 0 0 22px; text-wrap: balance; }
+.v-sub { font-size: 21px; line-height: 1.45; color: var(--tinta); margin: 0 0 24px; max-width: 34ch; }
 
 /* ferramenta */
-.v-ferramenta { position: relative; border: 1.5px solid var(--tinta); border-radius: var(--raio); padding: 22px; background: var(--papel); scroll-margin-top: 16px; }
-@media (min-width: 900px) { .v-ferramenta { padding: 28px; } }
+.v-ferramenta { position: relative; border: 1.5px solid var(--tinta); border-radius: var(--raio); padding: 22px; background: var(--cartao); scroll-margin-top: 16px; }
+.v-ferramenta > .v-botao { width: 100%; min-height: 60px; }
+@media (min-width: 900px) { .v-ferramenta { padding: 32px; } }
 .v-ferramenta.com-selo { margin-top: 14px; }
 .v-selo { position: absolute; top: -24px; right: 14px; transform: rotate(5deg); border: 3px solid var(--carimbo); background: var(--papel); color: var(--carimbo); padding: 5px 11px 6px; text-align: center; pointer-events: none; }
 .v-selo b { display: block; font: 400 22px/1 var(--display); text-transform: uppercase; }
@@ -159,11 +164,11 @@ body.vitrine a.v-botao.tinta { color: var(--papel); }
 @media (min-width: 900px) { .v-pacote { padding: 80px 64px; margin-left: 0; margin-right: 0; border-radius: var(--raio); } }
 .v-pacote h2 { font: 400 clamp(36px, 6vw, 64px)/0.98 var(--display); text-transform: uppercase; margin: 0 0 14px; max-width: 16ch; }
 .v-pacote > p { color: color-mix(in oklch, var(--papel) 72%, var(--tinta)); max-width: 52ch; margin: 0 0 32px; font-size: 18px; }
-.v-pacote dl { display: grid; gap: 0; margin: 0; border-top: 1px solid color-mix(in oklch, var(--papel) 30%, var(--tinta)); }
-.v-pacote dl > div { display: grid; gap: 4px 32px; padding: 18px 0; border-bottom: 1px solid color-mix(in oklch, var(--papel) 30%, var(--tinta)); }
-@media (min-width: 760px) { .v-pacote dl > div { grid-template-columns: 220px 1fr; } }
-.v-pacote dt { font: 500 16px/1.4 var(--mono); }
-.v-pacote dd { margin: 0; color: color-mix(in oklch, var(--papel) 78%, var(--tinta)); }
+.v-pacote > dl { display: grid; gap: 0; margin: 0; border-top: 1px solid color-mix(in oklch, var(--papel) 30%, var(--tinta)); }
+.v-pacote > dl > div { display: grid; gap: 4px 32px; padding: 18px 0; border-bottom: 1px solid color-mix(in oklch, var(--papel) 30%, var(--tinta)); }
+@media (min-width: 760px) { .v-pacote > dl > div { grid-template-columns: 220px 1fr; } }
+.v-pacote > dl dt { font: 500 16px/1.4 var(--mono); }
+.v-pacote > dl dd { margin: 0; color: color-mix(in oklch, var(--papel) 78%, var(--tinta)); }
 
 .v-narrativa { display: grid; gap: 24px; max-width: 68ch; }
 .v-narrativa p { margin: 0; font-size: 19px; line-height: 1.6; }
@@ -272,6 +277,7 @@ body.vitrine a.v-botao.tinta { color: var(--papel); }
 /* sua conta, sem senha (só com o login ligado) */
 .v-conta-faixa { margin-top: var(--secao); background: var(--tinta); color: var(--papel); padding: 48px var(--gutter); margin-left: calc(-1 * var(--gutter)); margin-right: calc(-1 * var(--gutter)); display: grid; gap: 40px; }
 @media (min-width: 900px) { .v-conta-faixa { padding: 80px 64px; margin-left: 0; margin-right: 0; border-radius: var(--raio); grid-template-columns: 5fr 7fr; gap: 64px; } }
+.v-heroi + .v-conta-faixa { margin-top: 0; }
 .v-conta-cab { display: grid; gap: 20px; justify-items: start; align-content: start; }
 .v-conta-cab h2 { font: 400 clamp(44px, 7vw, 72px)/0.95 var(--display); text-transform: uppercase; margin: 0; }
 .v-conta-cab p { margin: 0; font-size: 18px; max-width: 34ch; color: color-mix(in oklch, var(--papel) 78%, var(--tinta)); }
@@ -282,7 +288,9 @@ body.vitrine a.v-botao.tinta { color: var(--papel); }
 .v-beneficios strong { font-size: 19px; font-weight: 600; }
 .v-beneficios span:last-child { font-size: 16px; color: color-mix(in oklch, var(--papel) 78%, var(--tinta)); }
 
-.v-lado { display: grid; gap: 24px; }
-@media (min-width: 900px) { .v-lado { position: sticky; top: 24px; } .v-recibo { padding: 24px 24px 22px; font-size: 15px; } .v-recibo dl { grid-template-columns: 96px 1fr; } .v-recibo dd { font-size: 14px; } }
-.v-fatos { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font: 400 13px/1.4 var(--mono); color: var(--tinta-2); }
-.v-fatos li::before { content: "— "; color: var(--carimbo); }
+@media (min-width: 900px) { .v-recibo { padding: 24px 24px 22px; font-size: 15px; } .v-recibo dl { grid-template-columns: 96px 1fr; } .v-recibo dd { font-size: 14px; } }
+/* o recibo de exemplo mora na faixa do pacote: é o que a pessoa leva */
+.v-pacote { display: grid; grid-template-areas: "titulo" "texto" "recibo" "lista"; }
+.v-pacote > h2 { grid-area: titulo; } .v-pacote > p { grid-area: texto; } .v-pacote > dl { grid-area: lista; }
+.v-pacote-recibo { grid-area: recibo; margin: 0 0 32px; color: var(--tinta); }
+@media (min-width: 900px) { .v-pacote { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: 56px; grid-template-areas: "titulo recibo" "texto recibo" "lista recibo"; align-items: start; } .v-pacote-recibo { margin: 0; } }

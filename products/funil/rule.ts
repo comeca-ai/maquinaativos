@@ -6,6 +6,7 @@ export type MotivoFunil =
   | 'em_andamento'
   | 'criterio_atingido'
   | 'sem_pagador'
+  | 'sem_pagador_producao'
   | 'dor_sem_evidencia'
   | 'planilha_negativa'
   | 'sacada_copiavel'
@@ -29,6 +30,12 @@ export interface EntradaFunil {
   estadoAnterior?: EstadoFunil
   /** Reabrir morta exige evidência nova (nunca "mudei de ideia"). */
   novaEvidencia?: boolean
+  /**
+   * Número-vida acumulado nos últimos 90 dias, medido pelo placar (dinheiro ou
+   * resposta entregue). Só faz sentido para máquina 'viva': zero mata —
+   * morte provada em produção, não em tese.
+   */
+  sinalVida90d?: number
 }
 
 export const PRAZO_DIAS = 14
@@ -41,6 +48,13 @@ export function regra(c: EntradaFunil, ctx: Contexto): Veredito<EstadoFunil, Mot
     return c.novaEvidencia
       ? { estado: 'reaberta', motivo: 'nova_evidencia' }
       : { estado: 'morta', motivo: 'reabertura_negada' }
+  }
+
+  // Máquina viva avaliada pelo placar: o que produção mediu vence o que a tese prometeu.
+  if (c.estadoAnterior === 'viva' && c.sinalVida90d !== undefined) {
+    return c.sinalVida90d > 0
+      ? { estado: 'viva', motivo: 'criterio_atingido' }
+      : { estado: 'morta', motivo: 'sem_pagador_producao' }
   }
 
   if (c.sacadaCopiavel) return { estado: 'morta', motivo: 'sacada_copiavel' }

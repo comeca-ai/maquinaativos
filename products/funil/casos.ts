@@ -20,4 +20,6 @@ export const casos: CasoDeTeste[] = [
   { nome: 'prazo vencido com pouco sinal', entrada: base, ctx: { hoje: '2026-03-20' }, espera: { estado: 'morta', motivo: 'prazo_sem_sinal' } },
   { nome: 'morta com evidência nova reabre', entrada: { ...base, estadoAnterior: 'morta', novaEvidencia: true }, ctx: { hoje: '2026-04-01' }, espera: { estado: 'reaberta', motivo: 'nova_evidencia' } },
   { nome: 'morta sem evidência nova continua morta', entrada: { ...base, estadoAnterior: 'morta' }, ctx: { hoje: '2026-04-01' }, espera: { estado: 'morta', motivo: 'reabertura_negada' } },
+  { nome: 'viva, 90 dias com número-vida zero: morte provada em produção', entrada: { ...base, estadoAnterior: 'viva', sinalVida90d: 0 }, ctx: { hoje: '2026-04-01' }, espera: { estado: 'morta', motivo: 'sem_pagador_producao' } },
+  { nome: 'viva, número-vida positivo no placar: continua viva', entrada: { ...base, estadoAnterior: 'viva', sinalVida90d: 12 }, ctx: { hoje: '2026-04-01' }, espera: { estado: 'viva', motivo: 'criterio_atingido' } },
 ]

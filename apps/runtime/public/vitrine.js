@@ -77,7 +77,7 @@ function vestir(nome, cfg, casa, conta) {
       : conta?.loginDisponivel ? linkBotao(rotaEntrar(nome), 'Entrar', 'v-topo-entrar') : null)
   const logo = h('a', { href: casa, 'data-link': true, class: 'v-logo' }, ...nomeDaMarca(m))
   document.querySelector('.topo').replaceChildren(logo, nav)
-  document.querySelector('.rodape').replaceChildren(h('p', {}, h('span', {}, `${m.nome} preserva arquivos e carimba a data.`), h('span', {}, 'Não é aconselhamento jurídico.'), linkInterno(rotaMinhas(nome), 'Minhas provas')))
+  document.querySelector('.rodape').replaceChildren(h('p', {}, h('span', {}, `${m.nome} preserva arquivos e carimba a data.`), h('span', {}, 'Não é aconselhamento jurídico.'), linkInterno(rotaMinhas(nome), 'Minhas provas'), h('a', { href: `${casa}#base-legal` }, 'Base legal'), h('a', { href: `${casa}#limites` }, 'O que o carimbo não faz')))
 }
 
 function recibo({ id, nome, bytes, sha256, recebidoEm, carimbo, exemplo, bater }) {
@@ -247,7 +247,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   /* ferramenta */
   const aceite = h('input', { type: 'checkbox', id: 'aceite' })
   const consentimento = h('label', { class: 'v-consent', for: 'aceite' }, aceite,
-    h('span', {}, 'Autorizo guardar este arquivo num cofre privado. Só a impressão digital dele, não o arquivo, vai para um registro público. ', h('a', { href: m.baseLegal ? '#base-legal' : '#limites' }, 'O que isso prova')))
+    h('span', {}, 'Este conteúdo é meu ou tenho o direito de guardar. Só a impressão digital dele, não o arquivo, vai para um registro público. ', h('a', { href: m.baseLegal ? '#base-legal' : '#limites' }, 'O que o carimbo prova e o que não prova')))
   const arquivo = h('input', { type: 'file', id: 'arquivo', hidden: true, accept: cfg.tiposMime.map((t) => (t.endsWith('/') ? t + '*' : t)).join(',') })
   const principal = h('button', { type: 'button', class: 'v-botao', onclick: () => { if (consentido()) arquivo.click() } }, m.chamada || 'Escolher arquivo')
   const barra = h('i'); const progresso = h('div', { class: 'v-progresso', hidden: true, 'aria-hidden': 'true' }, barra)
@@ -372,13 +372,12 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   const reciboExemplo = recibo({ nome: exemplo.arquivo, bytes: exemplo.bytes, sha256: shaExemplo, recebidoEm: new Date().toISOString(), carimbo: 'OpenTimestamps → Bitcoin', exemplo: true, bater: true })
 
   /* seções */
+  // Desenho v2: manchete à esquerda, a ferramenta à direita (acima da dobra no computador; logo abaixo no celular).
   const heroi = h('section', { class: 'v-heroi' },
-    h('div', {}, h('p', { class: 'v-sobre' }, cfg.titulo), h('h1', { class: 'v-manchete' }, m.promessa), h('p', { class: 'v-sub' }, cfg.subtitulo), ferramenta, jaGuardou),
-    h('div', { class: 'v-lado' }, reciboExemplo,
-      h('ul', { class: 'v-fatos' },
-        h('li', {}, 'Cofre privado na Cloudflare, sem link público'),
-        h('li', {}, 'Data carimbada no Bitcoin via OpenTimestamps'),
-        h('li', {}, 'Relatório e pacote que você confere sem depender da gente'))))
+    h('div', { class: 'v-heroi-texto' },
+      h('p', { class: 'v-sobre' }, cfg.titulo), h('h1', { class: 'v-manchete' }, m.promessa), h('p', { class: 'v-sub' }, cfg.subtitulo),
+      h('p', { class: 'v-provas-linha' }, h('span', {}, 'Carimbo no Bitcoin'), h('span', { 'aria-hidden': 'true' }, '/'), h('span', {}, 'Relatório para anexar'), h('span', { 'aria-hidden': 'true' }, '/'), h('span', {}, 'Pacote que qualquer pessoa confere'))),
+    h('div', { class: 'v-heroi-acao' }, ferramenta, jaGuardou))
 
   const cenas = m.cenas?.length ? h('section', { class: 'v-secao v-cenas' }, h('h2', {}, 'Quando você vai precisar'),
     h('ol', {}, m.cenas.map((c, i) => h('li', {}, h('span', { class: 'v-num' }, String(i + 1).padStart(2, '0')), h('div', {}, h('h3', {}, c.titulo), h('p', {}, c.texto)))))) : null
@@ -386,6 +385,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
   const pacote = h('section', { class: 'v-pacote' },
     h('h2', {}, 'O que você leva para casa'),
     h('p', {}, 'Um pacote .zip que qualquer pessoa confere sem depender da gente, nem de que a gente continue existindo.'),
+    h('div', { class: 'v-pacote-recibo' }, reciboExemplo),
     h('dl', {},
       h('div', {}, h('dt', {}, 'seu arquivo'), h('dd', {}, 'Byte a byte, do jeito que chegou.')),
       h('div', {}, h('dt', {}, 'manifesto.json'), h('dd', {}, 'A impressão digital (SHA-256), o tamanho, o tipo e a hora em que o nosso servidor recebeu.')),
@@ -433,7 +433,7 @@ export async function paginaVitrine(nome, cfg, { raiz = false } = {}) {
 
   const fixa = h('div', { class: 'v-fixa', hidden: true }, h('button', { type: 'button', class: 'v-botao', onclick: irParaFerramenta }, m.chamada || 'Guardar agora'))
 
-  trocar(app, heroi, cenas, pacote, planos, contaSecao, como, perguntas, limites, fechamento, fixa)
+  trocar(app, heroi, contaSecao, planos, cenas, pacote, como, perguntas, limites, fechamento, fixa)
   evento(nome, 'visita', true)
 
   if ('IntersectionObserver' in window) {

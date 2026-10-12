@@ -116,6 +116,10 @@ api.get('/interesses', async (c) => {
   return c.json({ interesses: results })
 })
 
+// Placar mínimo: um número-vida por máquina, apurado por dia. Sem métrica de vaidade.
+api.get('/placar', async (c) => c.json(await lerPlacar(c.env)))
+api.post('/placar/apurar', async (c) => c.json(await apurarPlacar(c.env)))
+
 api.route('/', esteira)
 api.route('/', capturaInterna)
 api.route('/', vitrineInterna)

@@ -6,7 +6,7 @@ const data = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'use AAAA-MM-DD')
 
 export const funil = defineProduto<EstadoFunil, MotivoFunil, EntradaFunil>({
   nome: 'funil',
-  versao: 'v1',
+  versao: 'v2',
   entrada: z.object({
     inicio: data,
     conversasReais: z.number().int().min(0),
@@ -16,6 +16,7 @@ export const funil = defineProduto<EstadoFunil, MotivoFunil, EntradaFunil>({
     sacadaCopiavel: z.boolean(),
     estadoAnterior: z.enum(['em_teste', 'viva', 'morta', 'reaberta']).optional(),
     novaEvidencia: z.boolean().optional(),
+    sinalVida90d: z.number().min(0).optional(),
   }),
   estados: {
     em_teste: { final: false, prazoDias: PRAZO_DIAS },
@@ -28,6 +29,7 @@ export const funil = defineProduto<EstadoFunil, MotivoFunil, EntradaFunil>({
     em_andamento: 'em_teste',
     criterio_atingido: 'viva',
     sem_pagador: 'morta',
+    sem_pagador_producao: 'morta',
     dor_sem_evidencia: 'morta',
     planilha_negativa: 'morta',
     sacada_copiavel: 'morta',
@@ -42,6 +44,7 @@ export const funil = defineProduto<EstadoFunil, MotivoFunil, EntradaFunil>({
     'Não decide com IA: o veredito é regra pura.',
     'Não estende prazo por simpatia: prazo vencido sem sinal é morte.',
     'Não reabre ideia morta sem evidência nova.',
+    'Não perdoa máquina viva com 90 dias de número-vida zero: o placar manda, o dono só registra o perdão por escrito.',
   ],
 })
 

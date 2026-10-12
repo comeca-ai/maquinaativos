@@ -9,6 +9,7 @@
     "registro": "node scripts/gerar-registro.mjs",
     "registro:check": "node scripts/gerar-registro.mjs --check",
     "cerca": "node scripts/cerca.mjs",
+    "travas": "node scripts/travas.mjs",
     "dev": "wrangler dev",
     "publicar": "node scripts/verificar-deploy.mjs && wrangler d1 migrations apply maquina --remote && wrangler deploy",
     "db:local": "wrangler d1 migrations apply maquina --local",

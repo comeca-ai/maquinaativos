@@ -7,16 +7,17 @@
   "observability": { "enabled": true },
   "workers_dev": true,
   "preview_urls": false,
-  // Frontend estático no MESMO Worker. API e rotas públicas passam primeiro pelo código; o resto é arquivo.
+  // Frontend estático no MESMO Worker. API, rotas públicas e páginas HTML passam pelo código (meta tags da marca);
+  // JS, CSS, fontes e imagens vão direto para os arquivos.
   "assets": {
     "directory": "./apps/runtime/public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/pub/*", "/saude"]
+    "run_worker_first": ["/*", "!/*.js", "!/*.css", "!/fontes/*", "!/marcas/*"]
   },
   // Turnstile (opcional): `wrangler secret put TURNSTILE_SECRET` e defina TURNSTILE_SITEKEY aqui.
   // DOMINIOS: domínio -> produto que responde na raiz (JSON em texto).
-  "vars": { "TURNSTILE_SITEKEY": "", "DOMINIOS": "{\"tinhaprint.com.br\":\"prova-digital\",\"www.tinhaprint.com.br\":\"prova-digital\"}" },
+  "vars": { "TURNSTILE_SITEKEY": "", "EMAIL_REMETENTE": "Tinha Print <acesso@tinhaprint.com.br>", "LOGIN_EMAIL": "ligado", "DOMINIOS": "{\"tinhaprint.com.br\":\"prova-digital\",\"www.tinhaprint.com.br\":\"prova-digital\"}" },
   "d1_databases": [
     {
       "binding": "DB",
@@ -26,11 +27,40 @@
     }
   ],
   // Cofre de provas: bucket PRIVADO. Crie antes do deploy: `pnpm cf r2:criar maquina-provas` (ou painel). Nunca ative acesso público.
+  // Link mágico: Cloudflare Email Service. Em `wrangler dev` o envio é simulado (o e-mail aparece no log).
+  // Produção: o domínio do remetente precisa estar ativo e verificado no Email Service; secret SEGREDO_CONTA.
+  "send_email": [{ "name": "EMAIL" }],
   "r2_buckets": [{ "binding": "PROVAS", "bucket_name": "maquina-provas" }],
   // Confirma âncoras OpenTimestamps e reavalia casos abertos.
   "triggers": { "crons": ["17 * * * *"] },
   "workflows": [
     { "name": "maquina-caso", "binding": "CASO_WF", "class_name": "CasoWorkflow" }
-  ]
+  ],
   // Segredo de escrita: `wrangler secret put API_TOKEN` (local: `.dev.vars` na raiz).
+
+  // CÓPIA DE TESTE (v2): outro Worker, com banco, cofre e workflow PRÓPRIOS. Nada aqui toca os dados de produção.
+  // Tudo que está desligado em produção fica ligado aqui. Deploy: `.github/workflows/teste.yml` (ou `npx wrangler deploy --env teste`).
+  // Em env, vars/bindings/cron NÃO são herdados: repita tudo aqui.
+  "env": {
+    "teste": {
+      "name": "maquinaativos-teste",
+      "workers_dev": true,
+      "preview_urls": false,
+      "vars": { "AMBIENTE": "teste", "TURNSTILE_SITEKEY": "", "EMAIL_REMETENTE": "Tinha Print (teste) <acesso@tinhaprint.com.br>", "LOGIN_EMAIL": "ligado", "DOMINIOS": "{}" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "maquina-teste",
+          "database_id": "7150dbe3-01fd-4784-9a04-0d1c1e379ea3",
+          "migrations_dir": "apps/runtime/migrations"
+        }
+      ],
+      "send_email": [{ "name": "EMAIL" }],
+      "r2_buckets": [{ "binding": "PROVAS", "bucket_name": "maquina-provas-teste" }],
+      "triggers": { "crons": ["17 * * * *"] },
+      "workflows": [
+        { "name": "maquina-caso-teste", "binding": "CASO_WF", "class_name": "CasoWorkflow" }
+      ]
+    }
+  }
 }

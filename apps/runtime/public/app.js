@@ -1,39 +1,46 @@
 // Frontend genérico: não conhece nenhum produto. Renderiza o que a `tela` declarada manda.
-const app = document.getElementById('app')
+import { h, get, post, sha256Hex, ROTULO_RECUSA, ROTULO_ESTADO, baixarPacote, abrirRelatorio, origemDaVisita } from './base.js'
 
-function h(tag, attrs = {}, ...filhos) {
-  const el = document.createElement(tag)
-  for (const [k, v] of Object.entries(attrs)) {
-    if (v === false || v == null) continue
-    if (k === 'class') el.className = v
-    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v)
-    else el.setAttribute(k, v === true ? '' : String(v))
-  }
-  for (const f of filhos.flat()) el.append(f instanceof Node ? f : document.createTextNode(String(f ?? '')))
-  return el
-}
+// Fixa a origem da visita já na primeira página (antes de qualquer navegação interna mudar a URL).
+origemDaVisita()
+
+const app = document.getElementById('app')
+const TOPO_ORIGINAL = document.querySelector('.topo').innerHTML
+const RODAPE_ORIGINAL = document.querySelector('.rodape').innerHTML
+const vitrine = () => import('./vitrine.js')
+
 const limpar = () => { app.replaceChildren() }
-const get = async (url, opts) => { const r = await fetch(url, opts); const j = await r.json().catch(() => ({})); return { ok: r.ok, status: r.status, j } }
-const post = (url, corpo, headers = {}) => get(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(corpo) })
 
 /* ---------- roteador ---------- */
-function ir(caminho) { history.pushState({}, '', caminho); rotear() }
+function ir(caminho) { history.pushState({}, '', caminho); scrollTo(0, 0); rotear() }
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a[data-link]')
-  if (a && a.origin === location.origin) { e.preventDefault(); ir(a.pathname) }
+  if (a && a.origin === location.origin) { e.preventDefault(); ir(a.pathname + a.search) }
 })
 addEventListener('popstate', rotear)
+
+async function produtoDoDominio() {
+  const d = await get('/pub/dominio')
+  return d.ok && d.j.produto ? d.j.produto : null
+}
 
 async function rotear() {
   limpar()
   app.classList.remove('studio')
+  document.body.classList.remove('vitrine', 'com-fixa')
+  document.querySelector('.topo').innerHTML = TOPO_ORIGINAL
+  document.querySelector('.rodape').innerHTML = RODAPE_ORIGINAL
   const partes = location.pathname.split('/').filter(Boolean)
   if (partes.length === 0) {
-    const d = await get('/pub/dominio')
-    if (d.ok && d.j.produto) return paginaProduto(d.j.produto)
-    return paginaInicial()
+    const p = await produtoDoDominio()
+    return p ? paginaProduto(p, { raiz: true }) : paginaInicial()
   }
   if (partes[0] === 'studio') return studio()
+  if (partes[0] === 'entrar' || partes[0] === 'minhas-provas') {
+    const p = new URLSearchParams(location.search).get('p') || (await produtoDoDominio())
+    const v = await vitrine()
+    return partes[0] === 'entrar' ? v.paginaEntrar(p) : v.paginaMinhasProvas(p)
+  }
   return paginaProduto(partes[0])
 }
 
@@ -52,8 +59,9 @@ async function paginaInicial() {
 }
 
 /* ---------- público: página de produto gerada da tela ---------- */
-async function paginaProduto(nome) {
+async function paginaProduto(nome, { raiz = false } = {}) {
   const cap = await get(`/pub/${encodeURIComponent(nome)}/captura`)
+  if (cap.ok && cap.j.marca) return (await vitrine()).paginaVitrine(nome, cap.j, { raiz })
   if (cap.ok) return paginaCaptura(nome, cap.j)
   const { ok, j } = await get(`/pub/${encodeURIComponent(nome)}/tela`)
   if (!ok) return app.append(h('h1', {}, 'Não encontramos esta página'), h('p', {}, h('a', { href: '/', 'data-link': true }, 'Voltar ao início')))
@@ -203,46 +211,8 @@ async function secao(aba) {
 }
 
 /* ---------- público: captura de evidência (print, gravação, arquivo) ---------- */
-const hexDe = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('')
-const sha256Hex = async (blob) => hexDe(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))
-const ROTULO_RECUSA = { sem_consentimento: 'Sem o consentimento nada é guardado.', conteudo_vedado: 'Este tipo de conteúdo não pode ser preservado aqui.', abuso_por_volume: 'Muitas capturas em 24 horas. Tente novamente amanhã.' }
-const ROTULO_ESTADO = { aguardando_captura: 'Aguardando', guardada: 'Guardada no cofre', ancorando: 'Carimbo enviado, aguardando o Bitcoin', preservada: 'Preservada e ancorada', preservada_sem_ancora: 'Preservada (carimbo não confirmado no prazo)', falhou: 'Falhou', recusada: 'Recusada' }
-
-async function baixarPacote(nome, id, chave, msg) {
-  msg.className = ''; msg.textContent = 'Preparando o pacote…'
-  const r = await fetch(`/pub/${encodeURIComponent(nome)}/provas/${encodeURIComponent(id)}/pacote`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chave }) })
-  if (!r.ok) { msg.className = 'erro'; msg.textContent = r.status === 404 ? 'Código ou identificador não confere.' : 'Não foi possível baixar agora.'; return }
-  const url = URL.createObjectURL(await r.blob())
-  const a = h('a', { href: url, download: `prova-${id}.zip` }); document.body.append(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 15000); msg.textContent = 'Pacote baixado.'
-}
-
-function marcaHero(m) {
-  document.title = m.nome + ' — ' + m.promessa
-  const rodape = document.querySelector('.rodape p')
-  if (rodape) rodape.textContent = m.nome + ' preserva arquivos e carimba a data. Não é aconselhamento jurídico.'
-  const topo = document.querySelector('.topo .marca')
-  if (topo) {
-    const base = m.destaque ? m.nome.slice(0, m.nome.length - m.destaque.length) : m.nome
-    topo.replaceChildren(base, ...(m.destaque ? [h('span', {}, m.destaque)] : []))
-    topo.setAttribute('href', location.pathname)
-  }
-}
-
-function marcaDepois(m, _landing) {
-  return h('div', { class: 'marca-info' },
-    h('h2', {}, 'Como funciona'),
-    h('ol', { class: 'passos' }, m.passos.map((x) => h('li', {}, h('strong', {}, x.titulo), h('span', {}, x.texto)))),
-    m.perguntas.length ? h('h2', {}, 'Perguntas que todo mundo faz') : null,
-    m.perguntas.map((x) => h('details', { class: 'faq' }, h('summary', {}, x.pergunta), h('p', {}, x.resposta))),
-    h('h2', {}, 'O que a gente não faz'),
-    h('ul', { class: 'limites' }, m.limites.map((x) => h('li', {}, x))))
-}
-
 function paginaCaptura(nome, cfg) {
   document.title = cfg.titulo
-  const marca = cfg.marca
-  if (marca) marcaHero(marca)
   let tokenTurnstile = null
   const maxMB = Math.round(cfg.maxBytes / 1048576)
   const aceite = h('input', { type: 'checkbox', id: 'aceite-captura' })
@@ -257,8 +227,8 @@ function paginaCaptura(nome, cfg) {
     try {
       const sha = await sha256Hex(blob)
       msg.textContent = 'Enviando para o cofre…'
-      const q = new URLSearchParams({ nome: nomeArquivo, sha256: sha, origem, consentimento: '1' })
-      const r = await get(`/pub/${encodeURIComponent(nome)}/captura?${q}`, { method: 'PUT', headers: { 'content-type': blob.type || 'application/octet-stream', ...(tokenTurnstile ? { 'x-turnstile': tokenTurnstile } : {}) }, body: blob })
+      const q = new URLSearchParams({ sha256: sha, origem, consentimento: '1' })
+      const r = await get(`/pub/${encodeURIComponent(nome)}/captura?${q}`, { method: 'PUT', headers: { 'content-type': blob.type || 'application/octet-stream', 'x-nome-arquivo': encodeURIComponent(nomeArquivo), ...(tokenTurnstile ? { 'x-turnstile': tokenTurnstile } : {}) }, body: blob })
       if (!r.ok) {
         msg.className = 'erro'
         msg.textContent = r.j.recusada ? (ROTULO_RECUSA[r.j.motivo] || 'Recusada.') : r.status === 413 ? `Arquivo maior que ${maxMB} MB.` : r.status === 415 ? 'Tipo de arquivo não aceito.' : r.status === 429 ? 'Muitas tentativas. Tente mais tarde.' : r.j.erro === 'hash_divergente' ? 'O arquivo mudou durante o envio. Nada foi guardado. Tente de novo.' : 'Não foi possível preservar agora.'
@@ -283,8 +253,9 @@ function paginaCaptura(nome, cfg) {
       h('p', {}, h('strong', {}, 'Recebido em (relógio do servidor): '), r.recebidoEm),
       h('div', { class: 'acoes' },
         h('button', { onclick: () => baixarPacote(nome, r.id, r.codigoDeRecuperacao, m) }, 'Baixar pacote (.zip)'),
+        h('button', { class: 'sec', onclick: () => abrirRelatorio(nome, r.id, r.codigoDeRecuperacao) }, 'Ver relatório'),
         h('button', { class: 'sec', onclick: () => { const u = URL.createObjectURL(new Blob([`Identificador: ${r.id}\nCódigo de recuperação: ${r.codigoDeRecuperacao}\nSHA-256: ${r.sha256}\n`], { type: 'text/plain' })); const a = h('a', { href: u, download: `codigo-${r.id}.txt` }); document.body.append(a); a.click(); a.remove() } }, 'Salvar código (.txt)')),
-      m, h('p', { class: 'ajuda' }, 'O pacote traz o arquivo, o manifesto e a prova OpenTimestamps, verificáveis sem depender do nosso servidor.'))
+      m, h('p', { class: 'ajuda' }, 'O pacote traz o arquivo, o manifesto, a prova OpenTimestamps e o relatório, verificáveis sem depender do nosso servidor.'))
   }
 
   if (navigator.mediaDevices?.getDisplayMedia) {
@@ -328,19 +299,7 @@ function paginaCaptura(nome, cfg) {
   const recuperar = recuperarForm(nome)
   const consentimento = h('label', { class: 'consent', for: 'aceite-captura' }, aceite, 'Autorizo guardar este arquivo em cofre privado e enviar apenas o seu hash (uma impressão digital, nunca o conteúdo) a calendários públicos OpenTimestamps. Não guardamos o seu IP.')
   const ferramenta = [consentimento, botoes, h('label', { for: 'arq' }, `Ou envie um arquivo (até ${maxMB} MB)`), arquivo, msg, saida]
-  if (!marca) {
-    app.append(h('h1', {}, cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso), ...ferramenta, h('hr', { class: 'sep' }), recuperar)
-  } else {
-    app.classList.add('landing')
-    app.append(
-      h('section', { class: 'heroi' }, h('h1', {}, marca.promessa), h('p', { class: 'sub' }, cfg.subtitulo),
-        h('a', { class: 'botao', href: '#capturar', onclick: (ev) => { ev.preventDefault(); document.getElementById('capturar').scrollIntoView({ behavior: 'smooth' }); aceite.focus({ preventScroll: true }) } }, marca.chamada || 'Guardar uma prova agora'),
-        h('p', { class: 'selo' }, 'Cofre privado · carimbo OpenTimestamps no Bitcoin · pacote verificável sem depender da gente')),
-      marca.cenas?.length ? h('section', {}, h('h2', {}, 'Quando você vai precisar'), h('div', { class: 'cenas' }, marca.cenas.map((x) => h('div', { class: 'cena' }, h('strong', {}, x.titulo), h('span', {}, x.texto))))) : null,
-      h('section', { id: 'capturar', class: 'ferramenta' }, h('h2', { class: 'sem-topo' }, 'Guarde agora'), h('p', { class: 'aviso' }, cfg.aviso), ...ferramenta),
-      marcaDepois(marca, true),
-      h('section', { class: 'recuperar' }, recuperar))
-  }
+  app.append(h('h1', {}, cfg.titulo), h('p', { class: 'sub' }, cfg.subtitulo), h('p', { class: 'aviso' }, cfg.aviso), ...ferramenta, h('hr', { class: 'sep' }), recuperar)
 
   if (cfg.turnstileSitekey) {
     const alvo = h('div'); app.insertBefore(alvo, botoes)
@@ -363,7 +322,8 @@ function recuperarForm(nome) {
       h('p', {}, h('strong', {}, ROTULO_ESTADO[x.caso?.estado] || x.caso?.estado || 'Em andamento')),
       h('p', {}, `${x.nome} · ${x.bytes} bytes · carimbo: ${x.ancora}${x.otsAltura ? ' (bloco ' + x.otsAltura + ')' : ''}`),
       h('p', {}, h('span', { class: 'mono' }, x.sha256)),
-      h('button', { type: 'button', onclick: () => baixarPacote(nome, x.id, ch.value.trim(), msg) }, 'Baixar pacote (.zip)')))
+      h('button', { type: 'button', onclick: () => baixarPacote(nome, x.id, ch.value.trim(), msg) }, 'Baixar pacote (.zip)'),
+      h('button', { type: 'button', class: 'sec', onclick: () => abrirRelatorio(nome, x.id, ch.value.trim()) }, 'Ver relatório')))
   } }, h('h2', { class: 'sem-topo' }, 'Já guardei uma prova'), h('label', { for: 'rid' }, 'Identificador'), id, h('label', { for: 'rch' }, 'Código de recuperação'), ch, h('button', { type: 'submit', class: 'sec' }, 'Ver estado'), msg, saida)
   return f
 }
@@ -440,7 +400,40 @@ async function metricasView() {
     h('h2', {}, 'Por produto'),
     tabela([['produto', 'produto'], ['casos', 'casos'], ['receita', 'receita'], ['custo', 'custo'], ['margem', 'margem'], ['custoCaso', 'custo/caso']],
       m.porProduto.map((x) => ({ produto: x.produto, casos: x.casos, receita: reais(x.receitaCentavos), custo: reais(x.custoCentavos), margem: reais(x.margemCentavos), custoCaso: reais(x.custoPorCasoCentavos) })), ['casos', 'receita', 'custo', 'margem', 'custoCaso']),
-    h('p', { class: 'ajuda' }, 'Receita = pedidos marcados como pagos. Custo = lançamentos em /api/custos. Sem lançamento, o custo aparece zerado: não é prova de custo zero.'))
+    h('p', { class: 'ajuda' }, 'Receita = pedidos marcados como pagos. Custo = lançamentos em /api/custos. Sem lançamento, o custo aparece zerado: não é prova de custo zero.'),
+    await funilView())
+}
+
+const ROTULO_ETAPA = { visita: 'visitas', consentiu: 'autorizaram', escolheu: 'escolheram arquivo', guardou: 'guardaram', baixou: 'baixaram pacote', pediu_link: 'pediram acesso', entrou: 'entraram' }
+const pct = (n, d) => (d ? `${Math.round((n / d) * 1000) / 10}%` : '-')
+async function funilView() {
+  const [r, ret] = await Promise.all([api('/funil?dias=14'), api('/retorno?dias=30')])
+  if (!r.ok) return h('p', { class: 'erro' }, 'Falha ao carregar o funil.')
+  const produtosComDado = Object.entries(r.j.porProduto)
+  if (!produtosComDado.length) return h('div', {}, h('h2', {}, 'Funil da vitrine (14 dias)'), h('p', { class: 'vazio' }, 'Sem eventos ainda.'))
+  return h('div', {}, h('h2', {}, `Funil da vitrine (desde ${r.j.desde})`),
+    ...produtosComDado.map(([produto, c]) => {
+      const base = c.visita || 0
+      const origens = Object.entries(r.j.porOrigem?.[produto] || {})
+        .map(([origem, e]) => ({ origem, visitas: e.visita || 0, guardaram: e.guardou || 0, baixaram: e.baixou || 0, conv: pct(e.guardou || 0, e.visita || 0) }))
+        .sort((x, y) => y.visitas - x.visitas || y.guardaram - x.guardaram)
+      const v = ret.ok ? ret.j.porProduto?.[produto] : null
+      return h('div', {}, h('h3', {}, produto),
+        tabela([['etapa', 'etapa'], ['total', 'total'], ['pct', '% das visitas']],
+          r.j.etapas.map((e) => ({ etapa: ROTULO_ETAPA[e] || e, total: c[e] || 0, pct: pct(c[e] || 0, base) })), ['total', 'pct']),
+        h('h4', {}, 'De onde vêm'),
+        origens.length ? tabela([['origem', 'origem'], ['visitas', 'visitas'], ['guardaram', 'guardaram'], ['baixaram', 'baixaram'], ['conv', 'guardaram / visitas']], origens, ['visitas', 'guardaram', 'baixaram', 'conv'])
+          : h('p', { class: 'vazio' }, 'Ainda sem origem registrada (começa a contar com esta versão).'),
+        h('h4', {}, `Quem voltou (provas desde ${ret.ok ? ret.j.desde : '-'})`),
+        v ? tabela([['m', 'medida'], ['n', 'total'], ['p', '%']], [
+          { m: 'provas guardadas', n: v.provas, p: '' },
+          { m: 'baixaram o pacote ou abriram o relatório', n: v.baixaram, p: pct(v.baixaram, v.provas) },
+          { m: 'voltaram depois de 24 h (entre as com mais de 1 dia)', n: v.voltaram, p: pct(v.voltaram, v.elegiveis) },
+          { m: 'guardadas numa conta', n: v.naConta, p: pct(v.naConta, v.provas) },
+          { m: 'contas com 2 provas ou mais', n: v.contasComDuasOuMais, p: pct(v.contasComDuasOuMais, v.contas) },
+        ], ['n', 'p']) : h('p', { class: 'vazio' }, 'Sem provas no período.'))
+    }),
+    h('p', { class: 'ajuda' }, 'Tudo é contagem agregada, sem dado pessoal e sem cookie. A origem é o utm_source do link ou o nome do site de onde a pessoa veio; "desconhecida" é quem guardou sem passar pela vitrine nesta versão. "Voltou" sai do log de acessos que já existia. Robôs podem inflar as visitas.'))
 }
 
 async function pedidosView() {

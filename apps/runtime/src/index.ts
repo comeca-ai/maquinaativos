@@ -6,7 +6,6 @@ import { esteira } from './esteira'
 import { capturaPublica, capturaInterna, manutencaoCaptura } from './captura'
 import { conta, limparContas } from './conta'
 import { vitrinePublica, vitrineInterna, produtoDaPagina, comMetaDaMarca } from './vitrine'
-import { apurarPlacar, lerPlacar } from './placar'
 import type { Env } from './env'
 
 export { CasoWorkflow } from './workflow'
@@ -148,6 +147,5 @@ export default {
   async scheduled(_evento: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(manutencaoCaptura(env).then((r) => console.log('manutencao-captura', JSON.stringify(r))))
     ctx.waitUntil(limparContas(env))
-    ctx.waitUntil(apurarPlacar(env).then((r) => console.log('placar', JSON.stringify(r))))
   },
 } satisfies ExportedHandler<Env>

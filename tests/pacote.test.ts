@@ -43,4 +43,9 @@ describe('verificador offline do pacote', () => {
     const r = await verificarPacote((await pacote()).filter((x) => x.nome !== 'manifesto.json'))
     expect(r.integro).toBe(false)
   })
+  it('RELATORIO.html lido antes do arquivo (ordem de pasta) não é confundido com o arquivo preservado', async () => {
+    const p = await pacote()
+    const r = await verificarPacote([{ nome: 'RELATORIO.html', dados: enc.encode('<html></html>') }, ...p])
+    expect(r.integro).toBe(true)
+  })
 })

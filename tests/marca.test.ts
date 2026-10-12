@@ -13,3 +13,16 @@ describe('marca da captura', () => {
     expect(validarCaptura({ ...base, marca: { ...marca, limites: [] } })).toHaveLength(1)
   })
 })
+
+describe('base legal e planos na marca', () => {
+  const item = { norma: 'CPC, art. 369', trecho: 't', link: 'https://www.planalto.gov.br/x', leitura: 'l' }
+  it('aceita base legal com fonte https e ressalva', () => expect(validarCaptura({ ...base, marca: { ...marca, baseLegal: { intro: 'i', itens: [item], ressalva: 'r' } } })).toEqual([]))
+  it('recusa norma sem link https (sem fonte não entra)', () => expect(validarCaptura({ ...base, marca: { ...marca, baseLegal: { intro: 'i', itens: [{ ...item, link: 'planalto' }], ressalva: 'r' } } })).toHaveLength(1))
+  it('exige ressalva do que não foi confirmado', () => expect(validarCaptura({ ...base, marca: { ...marca, baseLegal: { intro: 'i', itens: [item], ressalva: '' } } })).toHaveLength(1))
+  it('plano precisa dizer o que inclui', () => expect(validarCaptura({ ...base, marca: { ...marca, planos: [{ nome: 'A', preco: 'R$ 1', unidade: 'x', inclui: [] }] } })).toHaveLength(1))
+  it('seção da conta precisa de título, texto e benefícios completos', () => {
+    expect(validarCaptura({ ...base, marca: { ...marca, conta: { titulo: 'Sua conta', texto: 'x', beneficios: [{ titulo: 'Um', texto: 'dois' }] } } })).toHaveLength(0)
+    expect(validarCaptura({ ...base, marca: { ...marca, conta: { titulo: 'Sua conta', texto: 'x', beneficios: [] } } })).toHaveLength(1)
+    expect(validarCaptura({ ...base, marca: { ...marca, conta: { titulo: '', texto: 'x', beneficios: [{ titulo: 'Um', texto: '' }] } } })).toHaveLength(1)
+  })
+})
